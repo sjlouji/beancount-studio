@@ -1,14 +1,14 @@
 # Local trial without TLS:
 #   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
-# then open http://localhost:8080
+# then open http://localhost:8080 (set BS_LOCAL_PORT in .env to use another port)
 services:
   caddy:
     ports: !override
-      - "8080:80"
+      - "${BS_LOCAL_PORT:-8080}:80"
     environment:
       DOMAIN: ":80"
   api:
     environment:
-      BS_PUBLIC_URL: http://localhost:8080
-      BS_CORS_ORIGINS: http://localhost:8080
+      BS_PUBLIC_URL: http://localhost:${BS_LOCAL_PORT:-8080}
+      BS_CORS_ORIGINS: http://localhost:${BS_LOCAL_PORT:-8080}
       BS_COOKIE_SECURE: "false"

@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,7 +21,10 @@ class Settings(BaseSettings):
         description="Used to sign password-reset tokens. Set a long random value.",
     )
     public_url: str = "http://localhost:3000"
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: str = Field(
+        default="http://localhost:3000",
+        description="Comma-separated origins allowed to call the API directly from a browser.",
+    )
 
     # Storage
     data_dir: Path = Path("./data")
@@ -52,12 +55,9 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 25 * 1024 * 1024
     bql_max_rows: int = 5000
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def _split_origins(cls, value: object) -> object:
-        if isinstance(value, str):
-            return [v.strip() for v in value.split(",") if v.strip()]
-        return value
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [v.strip() for v in self.cors_origins.split(",") if v.strip()]
 
     @property
     def ledgers_dir(self) -> Path:

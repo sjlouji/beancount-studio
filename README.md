@@ -43,7 +43,7 @@ For a local trial without TLS:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
-open http://localhost:8080
+open http://localhost:8080          # set BS_LOCAL_PORT in .env if 8080 is taken
 ```
 
 Create the first account in the browser; it becomes the administrator. Set
