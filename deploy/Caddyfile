@@ -1,0 +1,14 @@
+{$DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 40MB
+	}
+	handle /api/* {
+		reverse_proxy api:8000 {
+			flush_interval -1
+		}
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}

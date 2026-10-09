@@ -1,0 +1,41 @@
+;; Beancount Studio ledger — starter chart of accounts
+;; Docs: https://beancount.github.io/docs/
+option "title" "{title}"
+option "operating_currency" "{currency}"
+
+plugin "beancount.plugins.auto_accounts"
+
+;; ---------------------------------------------------------------------
+;; Assets
+{date} open Assets:Cash                         {currency}
+{date} open Assets:Bank:Checking                {currency}
+{date} open Assets:Bank:Savings                 {currency}
+
+;; Liabilities
+{date} open Liabilities:CreditCard              {currency}
+
+;; Equity
+{date} open Equity:Opening-Balances             {currency}
+
+;; Income
+{date} open Income:Salary                       {currency}
+{date} open Income:Interest                     {currency}
+
+;; Expenses
+{date} open Expenses:Food:Groceries             {currency}
+{date} open Expenses:Food:Restaurants           {currency}
+{date} open Expenses:Housing:Rent               {currency}
+{date} open Expenses:Housing:Utilities          {currency}
+{date} open Expenses:Transport                  {currency}
+{date} open Expenses:Health                     {currency}
+{date} open Expenses:Entertainment              {currency}
+{date} open Expenses:Shopping                   {currency}
+{date} open Expenses:Fees                       {currency}
+{date} open Expenses:Taxes                      {currency}
+
+;; ---------------------------------------------------------------------
+;; Opening balances — edit these to match your real balances.
+{date} pad Assets:Bank:Checking Equity:Opening-Balances
+{date_next} balance Assets:Bank:Checking   0.00 {currency}
+
+;; Transactions go below (or in included files, e.g. `include "2026.bean"`).

@@ -1,0 +1,174 @@
+"use client";
+
+import { CopyIcon, ExternalLinkIcon, SaveIcon, Trash2Icon } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+import { toast } from "sonner";
+import { ErrorState, LoadingState } from "@/components/app/states";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { errorMessage } from "@/lib/api/client";
+import { useDeleteEntry, useEntryContext, useUpdateEntry } from "@/lib/api/hooks";
+import type { EntryContext } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
+import { EntryCard } from "./entry-row";
+import { useLedgerContext } from "./ledger-context";
+
+function Balances({ title, balances }: { title: string; balances: Record<string, string[]> | null }) {
+  if (!balances) return null;
+  const rows = Object.entries(balances);
+  if (rows.length === 0) return null;
+  return (
+    <div>
+      <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h4>
+      <dl className="space-y-0.5 font-mono text-[12px]">
+        {rows.map(([account, amounts]) => (
+          <div key={account} className="flex items-baseline justify-between gap-3">
+            <dt className="truncate text-muted-foreground">{account}</dt>
+            <dd className="tabular text-right">{amounts.length ? amounts.join(", ") : "0"}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+export function EntryEditor(props: { context: EntryContext; onSaved?: () => void; onDeleted?: () => void }) {
+  // Remount the editor whenever the entry's source changes so the draft starts from the new slice.
+  return <EntryEditorInner key={`${props.context.entry.entryHash}:${props.context.sha256sum}`} {...props} />;
+}
+
+function EntryEditorInner({ context, onSaved, onDeleted }: { context: EntryContext; onSaved?: () => void; onDeleted?: () => void }) {
+  const { owner, slug, canWrite, base } = useLedgerContext();
+  const update = useUpdateEntry(owner, slug);
+  const remove = useDeleteEntry(owner, slug);
+  const [source, setSource] = useState(context.slice);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const dirty = source !== context.slice;
+  const editable = canWrite && Boolean(context.sha256sum);
+
+  async function save() {
+    try {
+      const result = await update.mutateAsync({ entryHash: context.entry.entryHash, source, sha256sum: context.sha256sum });
+      toast.success("Entry saved", { description: result.commit ? `Commit ${result.commit.slice(0, 7)}` : undefined });
+      onSaved?.();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
+
+  async function destroy() {
+    try {
+      await remove.mutateAsync({ entryHash: context.entry.entryHash, sha256sum: context.sha256sum });
+      toast.success("Entry deleted");
+      setConfirmDelete(false);
+      onDeleted?.();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <EntryCard entry={context.entry} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Balances title="Before" balances={context.balancesBefore} />
+        <Balances title="After" balances={context.balancesAfter} />
+      </div>
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source</h4>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => {
+                void navigator.clipboard.writeText(source);
+                toast.success("Copied");
+              }}
+            >
+              <CopyIcon data-icon="inline-start" /> Copy
+            </Button>
+            {context.entry.filename && (
+              <Button asChild variant="ghost" size="xs">
+                <Link href={`${base}/files/edit?path=${encodeURIComponent(context.entry.filename)}&line=${context.entry.lineno ?? 1}`}>
+                  <ExternalLinkIcon data-icon="inline-start" /> {context.entry.filename}:{context.entry.lineno}
+                </Link>
+              </Button>
+            )}
+          </div>
+        </div>
+        <Textarea value={source} onChange={(e) => setSource(e.target.value)} readOnly={!editable} rows={Math.min(18, Math.max(4, source.split("\n").length + 1))} className={cn("font-mono text-[12.5px] leading-6", !editable && "bg-muted/40")} spellCheck={false} />
+        {!context.sha256sum && <p className="mt-1 text-xs text-muted-foreground">This entry was generated by a plugin and has no editable source.</p>}
+      </div>
+      {editable && (
+        <div className="flex items-center justify-between gap-2">
+          <Button variant="destructive" size="sm" onClick={() => setConfirmDelete(true)}>
+            <Trash2Icon data-icon="inline-start" /> Delete
+          </Button>
+          <div className="flex gap-2">
+            {dirty && (
+              <Button variant="ghost" size="sm" onClick={() => setSource(context.slice)}>
+                Revert
+              </Button>
+            )}
+            <Button size="sm" disabled={!dirty || update.isPending} onClick={() => void save()}>
+              {update.isPending ? <Spinner className="size-4" data-icon="inline-start" /> : <SaveIcon data-icon="inline-start" />}
+              Save &amp; commit
+            </Button>
+          </div>
+        </div>
+      )}
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this entry?</AlertDialogTitle>
+            <AlertDialogDescription>The lines are removed from {context.entry.filename} and committed. You can restore them from History.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void destroy()} className="bg-destructive text-white hover:bg-destructive/90">
+              {remove.isPending ? <Spinner className="size-4" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+export function EntryContextSheet({ entryHash, onOpenChange }: { entryHash: string | null; onOpenChange: (open: boolean) => void }) {
+  const { owner, slug, base } = useLedgerContext();
+  const query = useEntryContext(owner, slug, entryHash);
+  return (
+    <Sheet open={Boolean(entryHash)} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+        <SheetHeader>
+          <SheetTitle className="font-heading text-2xl">Entry</SheetTitle>
+          <SheetDescription>
+            {entryHash && (
+              <Link href={`${base}/entry/${entryHash}`} className="font-mono text-xs hover:underline">
+                permalink · {entryHash.slice(0, 12)}
+              </Link>
+            )}
+          </SheetDescription>
+        </SheetHeader>
+        <div className="px-4 pb-6">
+          {query.isPending ? <LoadingState /> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : <EntryEditor context={query.data} onDeleted={() => onOpenChange(false)} />}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}

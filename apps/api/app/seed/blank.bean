@@ -1,0 +1,5 @@
+;; Beancount Studio ledger
+option "title" "{title}"
+option "operating_currency" "{currency}"
+
+{date} open Equity:Opening-Balances {currency}

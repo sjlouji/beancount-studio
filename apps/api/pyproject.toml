@@ -1,0 +1,54 @@
+[project]
+name = "beancount-studio-api"
+version = "0.1.0"
+description = "Beancount Studio API — self-hosted plain-text accounting backend (FastAPI + Fava core)."
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    "fastapi>=0.143,<1",
+    "uvicorn[standard]>=0.54",
+    "pydantic[email]>=2.14",
+    "pydantic-settings>=2.15",
+    "sqlalchemy[asyncio]>=2.1",
+    "aiosqlite>=0.22",
+    "asyncpg>=0.32",
+    "alembic>=1.20",
+    "argon2-cffi>=25.1",
+    "python-multipart>=0.0.32",
+    "fava>=1.30.16,<2",
+    "beancount>=3.2,<4",
+    "beanquery>=0.2",
+    "beangulp>=0.2",
+    "anthropic>=1.13",
+    "assistant-stream>=0.0.36",
+    "httpx>=0.28",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9",
+    "pytest-asyncio>=1.4",
+    "ruff>=0.16",
+    "pyright>=1.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "T20"]
+ignore = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.File", "fastapi.Form", "fastapi.Body", "Depends", "Query", "File", "Form", "Body"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false

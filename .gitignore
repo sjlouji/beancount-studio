@@ -1,0 +1,31 @@
+# OS / editors
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# Secrets
+.env
+.env.local
+.env.*.local
+deploy/.env
+
+# Python
+apps/api/.venv
+apps/api/data
+apps/api/tmp
+__pycache__/
+*.pyc
+.pytest_cache
+.ruff_cache
+
+# Node
+node_modules
+apps/web/.next
+apps/web/out
+apps/web/tsconfig.tsbuildinfo
+apps/web/next-env.d.ts
+*.log
+
+# Monaco assets are copied from node_modules on dev/build
+apps/web/public/monaco
