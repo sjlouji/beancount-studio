@@ -22,6 +22,7 @@ dependencies = [
     "anthropic>=1.13",
     "assistant-stream>=0.0.36",
     "httpx>=0.28",
+    "openai>=3.27",
 ]
 
 [dependency-groups]

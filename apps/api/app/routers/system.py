@@ -25,6 +25,8 @@ async def system_info(db: DbDep, settings: SettingsDep):
         app_name=settings.app_name,
         version=__version__,
         ai_enabled=settings.ai_enabled,
+        ai_provider=settings.resolved_ai_provider,
+        ai_model=settings.resolved_ai_model or None,
         email_enabled=settings.email_enabled,
         signup_enabled=settings.allow_signup or count == 0,
         has_users=count > 0,

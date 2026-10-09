@@ -1,95 +1,92 @@
-"""Chat endpoint: a fake Anthropic stream drives the agent loop end to end."""
+"""Chat endpoint: a scripted fake provider drives the agent loop end to end."""
 
 from __future__ import annotations
 
-import json
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from httpx import AsyncClient
 
 from app.ai import agent as agent_module
+from app.ai.messages import to_anthropic_messages
+from app.ai.providers.base import (
+    ChatProvider,
+    StreamEvents,
+    ToolCall,
+    ToolResult,
+    TurnResult,
+    unwrap_raw_turns,
+)
 from app.config import get_settings
 
 
-class _Block(SimpleNamespace):
-    def model_dump(self, **_: Any) -> dict[str, Any]:
-        return {k: v for k, v in self.__dict__.items() if v is not None}
+class FakeProvider(ChatProvider):
+    """Plays back scripted turns: each is {"text": str, "tool": {id, name, input} | None}."""
 
+    name = "fake"
 
-class _FakeStream:
-    """Emits one text delta, then (optionally) one tool_use block, then a final message."""
-
-    def __init__(self, turn: dict[str, Any]) -> None:
-        self.turn = turn
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exc):
-        return False
-
-    def __aiter__(self):
-        async def gen():
-            yield SimpleNamespace(
-                type="content_block_delta",
-                index=0,
-                delta=SimpleNamespace(type="text_delta", text=self.turn["text"]),
-            )
-            if self.turn.get("tool"):
-                tool = self.turn["tool"]
-                yield SimpleNamespace(
-                    type="content_block_start",
-                    index=1,
-                    content_block=SimpleNamespace(
-                        type="tool_use", name=tool["name"], id=tool["id"]
-                    ),
-                )
-                yield SimpleNamespace(
-                    type="content_block_delta",
-                    index=1,
-                    delta=SimpleNamespace(
-                        type="input_json_delta", partial_json=json.dumps(tool["input"])
-                    ),
-                )
-
-        return gen()
-
-    async def get_final_message(self):
-        content = [_Block(type="text", text=self.turn["text"])]
-        if self.turn.get("tool"):
-            tool = self.turn["tool"]
-            content.append(
-                _Block(type="tool_use", id=tool["id"], name=tool["name"], input=tool["input"])
-            )
-        return SimpleNamespace(
-            content=content, stop_reason="tool_use" if self.turn.get("tool") else "end_turn"
-        )
-
-
-class _FakeClient:
     def __init__(self, turns: list[dict[str, Any]]) -> None:
         self.turns = list(turns)
         self.requests: list[dict[str, Any]] = []
-        self.beta = SimpleNamespace(messages=SimpleNamespace(stream=self._stream))
 
-    def _stream(self, **kwargs: Any) -> _FakeStream:
-        self.requests.append(kwargs)
-        return _FakeStream(self.turns.pop(0))
+    def convert_history(self, messages, raw_turns):
+        native = unwrap_raw_turns(raw_turns, self.name)
+        blocks = {k: v.get("content") for k, v in native.items() if isinstance(v, dict)}
+        return to_anthropic_messages(messages, blocks)
+
+    async def stream_turn(
+        self, *, model, system, messages, tools, events: StreamEvents, max_tokens=16000
+    ):
+        self.requests.append({"model": model, "messages": list(messages), "tools": tools})
+        turn = self.turns.pop(0)
+        events.on_text(turn["text"])
+        blocks: list[dict[str, Any]] = [{"type": "text", "text": turn["text"]}]
+        calls: list[ToolCall] = []
+        if turn.get("tool"):
+            tool = turn["tool"]
+            await events.on_tool_call_start(tool["id"], tool["name"])
+            events.on_tool_call_delta(tool["id"], "{}")
+            calls.append(ToolCall(id=tool["id"], name=tool["name"], input=tool["input"]))
+            blocks.append(
+                {"type": "tool_use", "id": tool["id"], "name": tool["name"], "input": tool["input"]}
+            )
+        return TurnResult(
+            text=turn["text"],
+            tool_calls=calls,
+            stop_reason="tool_use" if calls else "end_turn",
+            raw_assistant={"role": "assistant", "content": blocks},
+        )
+
+    def tool_result_messages(self, results: list[ToolResult]):
+        return [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": r.tool_call_id,
+                        "content": str(r.result),
+                        "is_error": r.is_error,
+                    }
+                    for r in results
+                ],
+            }
+        ]
+
+    async def generate_json(self, *, model, system, parts, schema, max_tokens=16000):
+        raise NotImplementedError
 
 
 @pytest.fixture
 def fake_ai(monkeypatch: pytest.MonkeyPatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
-    holder: dict[str, _FakeClient] = {}
+    assert settings.ai_enabled
 
-    def make(turns: list[dict[str, Any]]) -> _FakeClient:
-        client = _FakeClient(turns)
-        holder["client"] = client
-        monkeypatch.setattr(agent_module, "get_client", lambda _settings: client)
-        return client
+    def make(turns: list[dict[str, Any]]) -> FakeProvider:
+        provider = FakeProvider(turns)
+        monkeypatch.setattr(agent_module, "get_provider", lambda _settings: provider)
+        return provider
 
     yield make
     monkeypatch.setattr(settings, "anthropic_api_key", "")
@@ -128,6 +125,7 @@ async def test_chat_streams_text_and_runs_backend_tool(
     )
     assert res.status_code == 200, res.text
     assert res.headers["x-vercel-ai-data-stream"] == "v1"
+    assert res.headers["cache-control"] == "no-cache, no-transform"
     body = res.text
     assert '0:"Let me check."' in body
     assert 'b:{"toolCallId": "toolu_1", "toolName": "run_bql_query"}' in body
@@ -248,9 +246,10 @@ async def test_edit_requires_approval_then_commits(
     assert commits.json()["commits"][0]["subject"] == "Add espresso"
 
 
-async def test_chat_disabled_without_key(client: AsyncClient, user: dict, ledger: dict):
+async def test_chat_disabled_without_provider(client: AsyncClient, user: dict, ledger: dict):
     res = await client.post(
         f"/api/ledgers/{ledger['owner']}/{ledger['slug']}/chat",
         json={"messages": [{"role": "user", "content": "hi"}]},
     )
     assert res.status_code == 503
+    assert "BS_OPENAI_BASE_URL" in res.json()["error"]["message"]

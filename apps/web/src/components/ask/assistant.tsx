@@ -21,7 +21,7 @@ import { useMemo } from "react";
 import { toast } from "sonner";
 import { Thread } from "@/components/assistant-ui/elements/thread.aui";
 import { useLedgerContext } from "@/components/ledger/ledger-context";
-import { keys, ledgerPath } from "@/lib/api/hooks";
+import { keys, ledgerPath, useSystemInfo } from "@/lib/api/hooks";
 import type { ThreadMessageLike as StoredMessage } from "@/lib/api/types";
 import { ApprovalCard } from "./approval-card";
 import { BqlToolUI, CheckEditToolUI, EditFilesToolUI, ListFilesToolUI, ReadFileToolUI, ReportToolUI, SearchToolUI, SummaryToolUI } from "./tool-uis";
@@ -78,7 +78,7 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
-/** PDFs travel as data URLs; the API turns them into Anthropic document blocks. */
+/** PDFs travel as data URLs; the API passes them to the model as documents (Anthropic) or a text note (OpenAI-compatible servers). */
 class PdfAttachmentAdapter implements AttachmentAdapter {
   accept = "application/pdf";
 
@@ -102,6 +102,7 @@ function toInitialMessages(messages: StoredMessage[] | undefined): ThreadMessage
 
 function Welcome() {
   const { ledger, canWrite } = useLedgerContext();
+  const { data: info } = useSystemInfo();
   return (
     <div className="flex flex-col items-center gap-3 py-10 text-center animate-rise">
       <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/12 text-primary">
@@ -111,6 +112,12 @@ function Welcome() {
       <p className="max-w-md text-sm text-muted-foreground">
         It can run queries, read your files and reports, and {canWrite ? "propose edits that you approve before anything is written" : "draft entries you can add yourself"}. Attach a receipt or statement to turn it into entries.
       </p>
+      {info?.aiModel && (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-mono">{info.aiModel}</span>
+          {info.aiProvider === "openai" ? " · self-hosted via an OpenAI-compatible server" : " · Anthropic"}
+        </p>
+      )}
     </div>
   );
 }

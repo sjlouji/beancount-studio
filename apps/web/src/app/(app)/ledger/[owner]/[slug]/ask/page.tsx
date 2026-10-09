@@ -61,7 +61,7 @@ function AskInner() {
         title="The assistant is not configured"
         description={
           <>
-            Set <code className="rounded bg-muted px-1 font-mono text-xs">BS_ANTHROPIC_API_KEY</code> on the API server to enable it. Everything else works without it.
+            Set <code className="rounded bg-muted px-1 font-mono text-xs">BS_ANTHROPIC_API_KEY</code> on the API server, or point <code className="rounded bg-muted px-1 font-mono text-xs">BS_OPENAI_BASE_URL</code> at an OpenAI-compatible server such as Ollama and set <code className="rounded bg-muted px-1 font-mono text-xs">BS_AI_MODEL</code>. Everything else works without it.
           </>
         }
       />

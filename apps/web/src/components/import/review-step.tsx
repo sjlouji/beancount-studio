@@ -97,7 +97,7 @@ export function ReviewStep({
           Suggest categories
         </Button>
         <p className="text-xs text-muted-foreground md:col-span-3">
-          {aiEnabled ? "Suggestions come from your payee history first, then the AI model for unknown payees." : "Suggestions come from your payee history. Enable BS_ANTHROPIC_API_KEY on the server to also use the AI model."}
+          {aiEnabled ? "Suggestions come from your payee history first, then the AI model for unknown payees." : "Suggestions come from your payee history. Configure a model on the server (BS_ANTHROPIC_API_KEY, or BS_OPENAI_BASE_URL + BS_AI_MODEL) to also use the AI model."}
         </p>
       </section>
 

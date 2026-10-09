@@ -197,6 +197,8 @@ class SystemInfo(BaseModel):
     app_name: str = Field(alias="appName")
     version: str
     ai_enabled: bool = Field(alias="aiEnabled")
+    ai_provider: str | None = Field(default=None, alias="aiProvider")
+    ai_model: str | None = Field(default=None, alias="aiModel")
     email_enabled: bool = Field(alias="emailEnabled")
     signup_enabled: bool = Field(alias="signupEnabled")
     has_users: bool = Field(alias="hasUsers")

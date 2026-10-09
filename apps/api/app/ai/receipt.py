@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import base64
-import json
 from typing import Any
 
-import anthropic
-
-from app.ai.client import get_client
+from app.ai.providers import ProviderError, get_provider
 from app.config import Settings
 from app.errors import LedgerError, ValidationError
 from app.logging_setup import get_logger
@@ -66,52 +63,35 @@ async def parse_receipt(
     accounts: list[str],
     currencies: list[str],
 ) -> dict[str, Any]:
-    client = get_client(settings)
+    provider = get_provider(settings)
     b64 = base64.b64encode(data).decode("ascii")
     if mime_type in IMAGE_TYPES:
-        file_block: dict[str, Any] = {
-            "type": "image",
-            "source": {"type": "base64", "media_type": mime_type, "data": b64},
-        }
+        file_part: dict[str, Any] = {"type": "image", "media_type": mime_type, "data": b64}
     elif mime_type == "application/pdf":
-        file_block = {
-            "type": "document",
-            "source": {"type": "base64", "media_type": "application/pdf", "data": b64},
-            "title": filename,
-        }
+        file_part = {"type": "pdf", "data": b64, "filename": filename}
     else:
         raise ValidationError("Receipts must be an image (JPEG, PNG, WEBP, GIF) or a PDF")
     expense_accounts = [a for a in accounts if a.startswith("Expenses")]
     payment_accounts = [a for a in accounts if a.startswith(("Assets", "Liabilities"))]
     prompt = (
-        "Extract this receipt or invoice into one transaction. Pick the expense account and the most plausible payment account "
-        "from the lists below (exact names). Use the receipt's currency; if none is printed, use "
-        f"{currencies[0] if currencies else 'USD'}. Keep narration short (what was bought).\n\n"
+        "Extract this receipt or invoice into one transaction. Pick the expense account and the most "
+        "plausible payment account from the lists below (exact names). Use the receipt's currency; if "
+        f"none is printed, use {currencies[0] if currencies else 'USD'}. Keep narration short (what was bought).\n\n"
         "Expense accounts:\n"
         + "\n".join(expense_accounts)
         + "\n\nPayment accounts:\n"
         + "\n".join(payment_accounts)
     )
     try:
-        response = await client.messages.create(
-            model=settings.ai_fast_model,
-            max_tokens=16000,
-            messages=[{"role": "user", "content": [file_block, {"type": "text", "text": prompt}]}],
-            output_config={
-                "effort": "low",
-                "format": {"type": "json_schema", "schema": _RECEIPT_SCHEMA},
-            },
+        parsed = await provider.generate_json(
+            model=settings.resolved_ai_fast_model,
+            system="You extract structured transactions from receipts. Return only JSON matching the schema.",
+            parts=[file_part, {"type": "text", "text": prompt}],
+            schema=_RECEIPT_SCHEMA,
         )
-    except anthropic.APIStatusError as exc:
-        log.error("receipt extraction failed (%s): %s", exc.status_code, exc.message)
-        raise LedgerError(f"Receipt extraction failed: {exc.message}") from exc
-    except anthropic.APIConnectionError as exc:
-        log.error("receipt extraction connection error: %s", exc)
-        raise LedgerError("Could not reach the AI provider") from exc
-    if response.stop_reason == "refusal":
-        raise LedgerError("The model declined to read this file")
-    text = next((b.text for b in response.content if b.type == "text"), "{}")
-    parsed = json.loads(text)
+    except ProviderError as exc:
+        log.error("receipt extraction failed (%s): %s", exc.kind, exc.message)
+        raise LedgerError(f"Receipt extraction failed: {exc.user_message}") from exc
     if parsed.get("expenseAccount") not in accounts and expense_accounts:
         parsed["expenseAccount"] = expense_accounts[0]
     if parsed.get("paymentAccount") not in accounts and payment_accounts:

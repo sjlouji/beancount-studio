@@ -187,7 +187,7 @@ export default function ReceiptPage() {
           title="Receipt reading is switched off"
           description={
             <>
-              Automatic extraction needs an Anthropic API key. Set <span className="font-mono text-[13px]">BS_ANTHROPIC_API_KEY</span> on the server and restart it. You can still enter the transaction by hand below.
+              Automatic extraction needs a configured model: set <span className="font-mono text-[13px]">BS_ANTHROPIC_API_KEY</span>, or <span className="font-mono text-[13px]">BS_OPENAI_BASE_URL</span> plus <span className="font-mono text-[13px]">BS_AI_MODEL</span> for a self-hosted model, then restart the server. You can still enter the transaction by hand below.
             </>
           }
         />

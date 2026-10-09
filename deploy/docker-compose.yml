@@ -1,7 +1,11 @@
 # Beancount Studio — single-host deployment.
 #
-#   cp .env.example .env   # set BS_SECRET_KEY, DOMAIN, optional BS_ANTHROPIC_API_KEY
+#   cp .env.example .env   # set BS_SECRET_KEY, DOMAIN, and optionally an AI provider
 #   docker compose up -d --build
+#
+# Open-source models: `docker compose --profile ollama up -d --build` adds an Ollama server on
+# the internal network. In .env set BS_OPENAI_BASE_URL=http://ollama:11434/v1 and
+# BS_AI_MODEL=<model>, then pull it once: `docker compose exec ollama ollama pull <model>`.
 #
 # Caddy terminates TLS for $DOMAIN (automatic certificates) and routes /api/* to the API
 # and everything else to the web app. Ledger repositories, uploads and the SQLite database
@@ -37,6 +41,23 @@ services:
     expose:
       - "8000"
 
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+    expose:
+      - "11434"
+    # GPU (NVIDIA): uncomment after installing the NVIDIA container toolkit.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -57,3 +78,4 @@ volumes:
   studio-data:
   caddy-data:
   caddy-config:
+  ollama-models:

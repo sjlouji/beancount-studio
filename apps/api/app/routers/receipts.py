@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.ai.providers import AI_DISABLED_MESSAGE
 from app.ai.receipt import parse_receipt
 from app.core.deps import DbDep, LedgerReadDep, LedgerWriteDep, SettingsDep, UserDep, author_for
 from app.errors import FeatureDisabledError, ValidationError
@@ -34,7 +35,7 @@ async def parse(
 ):
     if not settings.ai_enabled:
         raise FeatureDisabledError(
-            "Receipt scanning needs the AI assistant. Set BS_ANTHROPIC_API_KEY on the server."
+            f"Receipt scanning needs the AI assistant. {AI_DISABLED_MESSAGE}"
         )
     upload, data = await load_upload(db, settings, user, body.upload_id)
     ledger = access.ledger

@@ -1,15 +1,12 @@
-"""The ledger assistant: an Anthropic tool-use loop streamed through assistant-stream."""
+"""The ledger assistant: a provider-neutral tool-use loop streamed through assistant-stream."""
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
-import anthropic
 from assistant_stream import RunController
 
-from app.ai.client import get_client
-from app.ai.messages import to_anthropic_messages
+from app.ai.providers import ProviderError, ToolResult, get_provider, wrap_raw_turn
 from app.ai.tools import APPROVAL_TOOL, READ_TOOLS, WRITE_TOOLS, ToolContext, execute_tool
 from app.config import Settings
 from app.core.deps import LedgerAccess
@@ -69,20 +66,44 @@ def _frontend_tools(tools: dict[str, Any] | None) -> list[dict[str, Any]]:
 def build_tools(
     access: LedgerAccess, frontend_tools: dict[str, Any] | None
 ) -> tuple[list[dict[str, Any]], set[str]]:
+    """Backend tools plus the frontend-declared ones (minus any that shadow a backend tool)."""
     tools = list(READ_TOOLS)
-    frontend = _frontend_tools(frontend_tools)
-    frontend_names = {t["name"] for t in frontend}
     if access.can_write:
         tools += WRITE_TOOLS
-        tools += frontend
-    else:
-        tools += [t for t in frontend if t["name"] != APPROVAL_TOOL]
-        frontend_names.discard(APPROVAL_TOOL)
-    return tools, frontend_names
+    backend_names = {t["name"] for t in tools}
+    frontend = [t for t in _frontend_tools(frontend_tools) if t["name"] not in backend_names]
+    if not access.can_write:
+        frontend = [t for t in frontend if t["name"] != APPROVAL_TOOL]
+    tools += frontend
+    return tools, {t["name"] for t in frontend}
+
+
+class _ControllerEvents:
+    """Bridges provider stream events onto the assistant-stream run controller."""
+
+    def __init__(self, controller: RunController) -> None:
+        self.controller = controller
+        self.tool_controllers: dict[str, Any] = {}
+
+    def on_text(self, delta: str) -> None:
+        self.controller.append_text(delta)
+
+    def on_reasoning(self, delta: str) -> None:
+        self.controller.append_reasoning(delta)
+
+    async def on_tool_call_start(self, tool_call_id: str, name: str) -> None:
+        self.tool_controllers[tool_call_id] = await self.controller.add_tool_call(
+            name, tool_call_id
+        )
+
+    def on_tool_call_delta(self, tool_call_id: str, partial_json: str) -> None:
+        tc = self.tool_controllers.get(tool_call_id)
+        if tc is not None:
+            tc.append_args_text(partial_json)
 
 
 class AgentRun:
-    """One streamed agent turn. Collects the raw assistant blocks for append-only replay."""
+    """One streamed agent turn. Collects the raw assistant turns for append-only replay."""
 
     def __init__(
         self,
@@ -93,7 +114,7 @@ class AgentRun:
         request_messages: list[dict[str, Any]],
         frontend_tools: dict[str, Any] | None,
         extra_system: str | None,
-        raw_turns: dict[str, list[dict[str, Any]]],
+        raw_turns: dict[str, Any],
         approved_hashes: set[str],
     ) -> None:
         self.settings = settings
@@ -106,12 +127,12 @@ class AgentRun:
         self.ctx = ToolContext(store=store, access=access, approved_hashes=approved_hashes)
         # Output collected for persistence (assistant-ui ThreadMessageLike content parts).
         self.parts: list[dict[str, Any]] = []
-        self.new_raw_turns: dict[str, list[dict[str, Any]]] = {}
+        self.new_raw_turns: dict[str, Any] = {}
 
     async def run(self, controller: RunController) -> None:
         settings = self.settings
-        client = get_client(settings)
-        systems, messages = to_anthropic_messages(self.request_messages, self.raw_turns)
+        provider = get_provider(settings)
+        systems, messages = provider.convert_history(self.request_messages, self.raw_turns)
         if not messages:
             controller.add_error("The conversation has no user message")
             return
@@ -121,124 +142,77 @@ class AgentRun:
             system_text += "\n\n" + self.extra_system
         if systems:
             system_text += "\n\n" + "\n\n".join(systems)
-        system_blocks = [
-            {"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}
-        ]
+        events = _ControllerEvents(controller)
 
         for _step in range(settings.ai_max_steps):
             if controller.is_cancelled:
                 return
             try:
-                async with client.beta.messages.stream(
-                    model=settings.ai_model,
-                    max_tokens=16000,
-                    system=system_blocks,
+                turn = await provider.stream_turn(
+                    model=settings.resolved_ai_model,
+                    system=system_text,
                     messages=messages,
                     tools=tools,
-                    output_config={"effort": "medium"},
-                    betas=["server-side-fallback-2026-07-01"],
-                    fallbacks="default",
-                ) as stream:
-                    tool_controllers: dict[int, Any] = {}
-                    async for event in stream:
-                        if controller.is_cancelled:
-                            return
-                        if event.type == "content_block_start":
-                            block = event.content_block
-                            if block.type == "tool_use":
-                                tool_controllers[event.index] = await controller.add_tool_call(
-                                    block.name, block.id
-                                )
-                        elif event.type == "content_block_delta":
-                            delta = event.delta
-                            if delta.type == "text_delta":
-                                controller.append_text(delta.text)
-                            elif delta.type == "input_json_delta":
-                                tc = tool_controllers.get(event.index)
-                                if tc is not None:
-                                    tc.append_args_text(delta.partial_json)
-                    final = await stream.get_final_message()
-            except anthropic.RateLimitError as exc:
-                log.warning("assistant rate limited: %s", exc)
-                controller.add_error(
-                    "The AI provider is rate limiting requests. Please try again in a moment."
+                    events=events,
                 )
-                return
-            except anthropic.AuthenticationError as exc:
-                log.error("assistant auth error: %s", exc)
-                controller.add_error(
-                    "The server's AI credentials were rejected. Ask the administrator to check the API key."
-                )
-                return
-            except anthropic.APIStatusError as exc:
-                log.error("assistant API error %s: %s", exc.status_code, exc.message)
-                controller.add_error(f"AI request failed ({exc.status_code}): {exc.message}")
-                return
-            except anthropic.APIConnectionError as exc:
-                log.error("assistant connection error: %s", exc)
-                controller.add_error(
-                    "Could not reach the AI provider. Check the server's network connection."
-                )
+            except ProviderError as exc:
+                log.error("assistant turn failed (%s): %s", exc.kind, exc.message)
+                controller.add_error(exc.user_message)
                 return
 
-            raw_blocks = [b.model_dump(mode="json", exclude_none=True) for b in final.content]
-            text_parts = [b.text for b in final.content if b.type == "text" and b.text]
-            tool_uses = [b for b in final.content if b.type == "tool_use"]
-            for text in text_parts:
-                self.parts.append({"type": "text", "text": text})
-            for block in tool_uses:
-                self.new_raw_turns[block.id] = raw_blocks
+            if turn.text:
+                self.parts.append({"type": "text", "text": turn.text})
+            for call in turn.tool_calls:
+                self.new_raw_turns[call.id] = wrap_raw_turn(provider.name, turn.raw_assistant)
                 self.parts.append(
                     {
                         "type": "tool-call",
-                        "toolCallId": block.id,
-                        "toolName": block.name,
-                        "args": block.input,
+                        "toolCallId": call.id,
+                        "toolName": call.name,
+                        "args": call.input,
                     }
                 )
 
-            if final.stop_reason == "refusal":
+            if turn.stop_reason == "refusal":
                 controller.add_error("The assistant declined this request.")
                 return
-            if final.stop_reason == "max_tokens" and tool_uses:
+            if turn.stop_reason == "max_tokens" and turn.tool_calls:
                 controller.add_error(
                     "The response was cut off before the tool call completed. Please try again."
                 )
                 return
-            if not tool_uses:
+            if not turn.tool_calls:
                 return
 
-            messages.append({"role": "assistant", "content": raw_blocks})
-            results: list[dict[str, Any]] = []
+            messages.append(turn.raw_assistant)
+            results: list[ToolResult] = []
             waiting_for_frontend = False
-            for block in tool_uses:
-                args = block.input if isinstance(block.input, dict) else {}
-                if block.name in frontend_names:
+            for call in turn.tool_calls:
+                if call.name in frontend_names:
                     waiting_for_frontend = True
                     continue
-                result, is_error = await execute_tool(self.ctx, block.name, args)
-                tc = next(
-                    (c for c in tool_controllers.values() if c.tool_call_id == block.id), None
-                )
+                if call.input_error:
+                    result: Any = {"error": call.input_error}
+                    is_error = True
+                else:
+                    result, is_error = await execute_tool(self.ctx, call.name, call.input)
+                tc = events.tool_controllers.get(call.id)
                 if tc is not None:
                     tc.set_response(result, is_error=is_error)
                 for part in self.parts:
-                    if part.get("toolCallId") == block.id:
+                    if part.get("toolCallId") == call.id:
                         part["result"] = result
                         if is_error:
                             part["isError"] = True
                 results.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": json.dumps(result, ensure_ascii=False, default=str),
-                        "is_error": is_error,
-                    }
+                    ToolResult(
+                        tool_call_id=call.id, name=call.name, result=result, is_error=is_error
+                    )
                 )
             if waiting_for_frontend:
                 # The user must answer (approve/reject) before the loop can continue.
                 return
-            messages.append({"role": "user", "content": results})
+            messages.extend(provider.tool_result_messages(results))
         controller.append_text(
             "\n\n_I stopped after reaching the step limit for one turn. Ask me to continue if needed._"
         )

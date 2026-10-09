@@ -16,6 +16,7 @@ from app.ai.messages import (
     last_user_message_for_history,
     tool_results_in_last_message,
 )
+from app.ai.providers import AI_DISABLED_MESSAGE
 from app.ai.tools import approved_hashes_from_messages
 from app.core.deps import DbDep, LedgerReadDep, SettingsDep, UserDep
 from app.db.base import get_session_factory
@@ -164,9 +165,7 @@ async def chat(
     request: Request, access: LedgerReadDep, user: UserDep, db: DbDep, settings: SettingsDep
 ):
     if not settings.ai_enabled:
-        raise FeatureDisabledError(
-            "The AI assistant is not configured. Set BS_ANTHROPIC_API_KEY on the server."
-        )
+        raise FeatureDisabledError(AI_DISABLED_MESSAGE)
     body = await request.json()
     messages = body.get("messages")
     if not isinstance(messages, list) or not messages:
@@ -203,5 +202,7 @@ async def chat(
 
     response = DataStreamResponse(create_run(callback))
     response.headers["x-vercel-ai-data-stream"] = "v1"
-    response.headers["Cache-Control"] = "no-cache"
+    # no-transform stops proxies (the Next.js rewrite, nginx, Caddy) from gzip-buffering the stream.
+    response.headers["Cache-Control"] = "no-cache, no-transform"
+    response.headers["X-Accel-Buffering"] = "no"
     return response

@@ -229,3 +229,142 @@ def tool_results_in_last_message(messages: list[dict[str, Any]]) -> dict[str, An
             output = part.get("output") or {}
             results[part["toolCallId"]] = output.get("value", part.get("result"))
     return results
+
+
+# ------------------------------------------------------------ OpenAI-compatible
+
+
+def file_part_to_openai(part: dict[str, Any]) -> dict[str, Any] | None:
+    """Turn an AI SDK file part into an OpenAI chat content part (image_url or text)."""
+    data = part.get("data")
+    media_type = (
+        part.get("mediaType") or part.get("mimeType") or "application/octet-stream"
+    ).lower()
+    filename = part.get("filename") or "attachment"
+    if not isinstance(data, str):
+        return None
+    if data.startswith(("http://", "https://")):
+        if media_type in IMAGE_TYPES:
+            return {"type": "image_url", "image_url": {"url": data}}
+        return {"type": "text", "text": f"[Attachment {filename} at {data}]"}
+    if data.startswith("data:"):
+        media_from_url, raw = _decode_data_url(data)
+        media_type = media_from_url or media_type
+        if media_type in IMAGE_TYPES:
+            return {"type": "image_url", "image_url": {"url": data}}
+    else:
+        try:
+            raw = base64.b64decode(data)
+        except ValueError:
+            raw = None
+        if media_type in IMAGE_TYPES:
+            return {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{data}"}}
+    if raw is None:
+        return None
+    if media_type.startswith(TEXT_TYPES_PREFIX) or filename.lower().endswith(
+        (".csv", ".txt", ".bean", ".beancount", ".qif", ".ofx", ".json", ".md")
+    ):
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            text = raw.decode("latin-1", "replace")
+        return {
+            "type": "text",
+            "text": f'<attachment filename="{filename}">\n{text[:200_000]}\n</attachment>',
+        }
+    if media_type == "application/pdf":
+        return {
+            "type": "text",
+            "text": f"[The user attached {filename} (PDF). This model server cannot read PDFs; ask for an image or the text.]",
+        }
+    return {"type": "text", "text": f"[Unsupported attachment type {media_type}: {filename}]"}
+
+
+def to_openai_messages(
+    messages: list[dict[str, Any]], raw_assistant_turns: dict[str, Any] | None = None
+) -> tuple[list[str], list[dict[str, Any]]]:
+    """Convert LanguageModelV2 messages to OpenAI chat-completions messages.
+
+    `raw_assistant_turns` maps a toolCallId to the exact assistant message the server produced,
+    replayed verbatim so tool-call ids and argument strings match what the model emitted.
+    """
+    systems: list[str] = []
+    out: list[dict[str, Any]] = []
+    raw_assistant_turns = raw_assistant_turns or {}
+    for message in messages:
+        role = message.get("role")
+        content = message.get("content")
+        if role == "system":
+            if isinstance(content, str) and content.strip():
+                systems.append(content)
+            continue
+        if role == "user":
+            parts: list[dict[str, Any]] = []
+            if isinstance(content, str):
+                parts.append({"type": "text", "text": content})
+            else:
+                for part in content or []:
+                    if part.get("type") == "text" and part.get("text"):
+                        parts.append({"type": "text", "text": part["text"]})
+                    elif part.get("type") == "file":
+                        converted = file_part_to_openai(part)
+                        if converted:
+                            parts.append(converted)
+            if parts:
+                if all(p["type"] == "text" for p in parts):
+                    out.append({"role": "user", "content": "\n\n".join(p["text"] for p in parts)})
+                else:
+                    out.append({"role": "user", "content": parts})
+            continue
+        if role == "assistant":
+            raw = None
+            for part in content or []:
+                if (
+                    part.get("type") == "tool-call"
+                    and part.get("toolCallId") in raw_assistant_turns
+                ):
+                    raw = raw_assistant_turns[part["toolCallId"]]
+                    break
+            if isinstance(raw, dict):
+                out.append(raw)
+                continue
+            text = "".join(p.get("text", "") for p in content or [] if p.get("type") == "text")
+            tool_calls = []
+            for part in content or []:
+                if part.get("type") == "tool-call":
+                    args = (
+                        part.get("input")
+                        if isinstance(part.get("input"), dict)
+                        else (part.get("args") or {})
+                    )
+                    tool_calls.append(
+                        {
+                            "id": part["toolCallId"],
+                            "type": "function",
+                            "function": {
+                                "name": part["toolName"],
+                                "arguments": json.dumps(args, ensure_ascii=False),
+                            },
+                        }
+                    )
+            native: dict[str, Any] = {"role": "assistant", "content": text or None}
+            if tool_calls:
+                native["tool_calls"] = tool_calls
+            if text or tool_calls:
+                out.append(native)
+            continue
+        if role == "tool":
+            for part in content or []:
+                if part.get("type") != "tool-result":
+                    continue
+                output = part.get("output") or {}
+                value = output.get("value", part.get("result"))
+                text = (
+                    value
+                    if isinstance(value, str)
+                    else json.dumps(value, ensure_ascii=False, default=str)
+                )
+                out.append({"role": "tool", "tool_call_id": part["toolCallId"], "content": text})
+    while out and out[0]["role"] != "user":
+        out.pop(0)
+    return systems, out

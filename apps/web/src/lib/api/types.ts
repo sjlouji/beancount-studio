@@ -19,6 +19,8 @@ export interface SystemInfo {
   appName: string;
   version: string;
   aiEnabled: boolean;
+  aiProvider: "anthropic" | "openai" | null;
+  aiModel: string | null;
   emailEnabled: boolean;
   signupEnabled: boolean;
   hasUsers: boolean;

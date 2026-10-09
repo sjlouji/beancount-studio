@@ -25,8 +25,10 @@ pnpm exec tsc --noEmit && pnpm lint && pnpm build
 - `apps/api/app/ledgers/engine.py` — every report/journal function (sync, returns JSON-safe dicts).
 - `apps/api/app/routers/*` — HTTP routes; `core/deps.py` — auth (cookie or `bsk_` key) and
   ledger access roles (`LedgerReadDep`, `LedgerWriteDep`, `LedgerAdminDep`).
-- `apps/api/app/ai/*` — assistant: `agent.py` (streaming loop), `tools.py` (tool schemas +
-  executors + approval hashing), `messages.py` (assistant-ui ⇄ Anthropic conversion).
+- `apps/api/app/ai/*` — assistant: `agent.py` (provider-neutral streaming loop), `tools.py`
+  (tool schemas + executors + approval hashing), `messages.py` (assistant-ui ⇄ Anthropic /
+  OpenAI message conversion), `providers/` (`anthropic_provider.py`, `openai_provider.py` for
+  Ollama/vLLM/LM Studio/OpenRouter; `get_provider(settings)` picks from `BS_AI_PROVIDER`).
 - `apps/web/src/lib/api/{client,types,hooks}.ts` — the typed API layer. Add new endpoints there.
 - `apps/web/src/components/ledger/*` — ledger shell, context (`useLedgerContext`), shared pieces.
 

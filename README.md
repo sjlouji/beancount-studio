@@ -28,8 +28,10 @@ with a different stack and no hosted dependencies: **Next.js 16 + shadcn/ui** in
 | Data pages | Accounts (tree/table, open/close), commodities and price charts, documents with previews, events timeline, errors with jump-to-line, a BQL workbench with sortable results and CSV download. |
 | Accounts & sharing | Email/password accounts (first user is admin), public or private ledgers, a public gallery, per-ledger collaborators (read/write/admin), stars, personal access tokens with read/write scopes, password reset by email (optional). |
 
-Everything runs without any third-party service. Set an Anthropic API key to enable the
-assistant, receipt scanning and AI categorisation; set SMTP to enable password-reset email.
+Everything runs without any third-party service. The assistant, receipt scanning and AI
+categorisation work with either an Anthropic API key or an open-source model served by
+Ollama, vLLM, LM Studio, llama.cpp or any other OpenAI-compatible server (see
+[Open-source models](#open-source-models)); set SMTP to enable password-reset email.
 
 ## Quick start (Docker)
 
@@ -74,8 +76,8 @@ Checks: `cd apps/api && uv run ruff check app tests && uv run pytest` and
 
 ```
 apps/web   Next.js 16 (App Router) · React 19 · Tailwind v4 · shadcn/ui · TanStack Query · Recharts · Monaco · assistant-ui
-apps/api   FastAPI · SQLAlchemy (SQLite by default, PostgreSQL optional) · beancount 3 + beanquery + fava core · git · anthropic SDK
-deploy     docker-compose (web + api + Caddy), Caddyfile, env template
+apps/api   FastAPI · SQLAlchemy (SQLite by default, PostgreSQL optional) · beancount 3 + beanquery + fava core · git · anthropic + openai SDKs
+deploy     docker-compose (web + api + Caddy, optional Ollama profile), Caddyfile, env template
 docs       conventions and design notes
 ```
 
@@ -85,10 +87,12 @@ docs       conventions and design notes
   balances, conversions, intervals, budgets and BQL behave exactly like Beancount/Fava.
 - **The web app never talks to Beancount directly.** It calls the API through same-origin
   `/api/*` routes (Next.js rewrites), so the session cookie works without CORS.
-- **The assistant runs server-side** with the Anthropic SDK and streams through
+- **The assistant runs server-side** behind a small provider interface
+  (`apps/api/app/ai/providers`): one implementation uses the Anthropic SDK, the other any
+  OpenAI-compatible chat-completions server with tool calling. Both stream through
   `assistant-stream` to the assistant-ui data-stream runtime. Write tools require an approved
   `request_approval` call for the exact same operations; the backend verifies the approval hash
-  before committing.
+  before committing, whichever model is driving.
 - See [docs/frontend-conventions.md](docs/frontend-conventions.md) for the UI patterns.
 
 ## Configuration
@@ -103,12 +107,37 @@ API settings are environment variables prefixed with `BS_` (see `apps/api/.env.e
 | `BS_PUBLIC_URL` / `BS_CORS_ORIGINS` | `http://localhost:3000` | Public URL (emails) and allowed origins |
 | `BS_ALLOW_SIGNUP` | `true` | Allow new accounts after the first one |
 | `BS_COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
-| `BS_ANTHROPIC_API_KEY` | — | Enables the assistant, receipts and AI categorisation |
-| `BS_AI_MODEL` / `BS_AI_FAST_MODEL` | `claude-opus-5-5` | Chat model / extraction and categorisation model |
+| `BS_AI_PROVIDER` | `auto` | `anthropic`, `openai` (any OpenAI-compatible server), `disabled`; `auto` prefers Anthropic when its key is set |
+| `BS_ANTHROPIC_API_KEY` | — | Anthropic provider |
+| `BS_OPENAI_BASE_URL` / `BS_OPENAI_API_KEY` | — | OpenAI-compatible provider, e.g. `http://ollama:11434/v1` (key optional for local servers) |
+| `BS_AI_MODEL` / `BS_AI_FAST_MODEL` | `claude-opus-5-5` on Anthropic | Chat model / extraction and categorisation model (fast model defaults to the chat model). Required for OpenAI-compatible servers |
 | `BS_SMTP_*` | — | Password-reset email |
 | `BS_MAX_UPLOAD_BYTES` | 25 MB | Upload limit |
 
 The web app reads `API_URL` (server-side address of the API, default `http://localhost:8000`).
+
+### Open-source models
+
+The assistant is a tool-use agent, so the model must support function calling; receipts
+additionally need vision. Good self-hosted choices today are Qwen3 (`qwen3:14b` and up),
+Llama 3.3 70B, Mistral Small 3 and DeepSeek V3 for chat, and Qwen2.5-VL / Gemma 3 for
+receipts. Small models can run the loop but are less reliable at building valid ledger edits.
+
+**Bundled Ollama (Docker):**
+
+```bash
+cd deploy
+docker compose --profile ollama up -d --build
+docker compose exec ollama ollama pull qwen3:14b
+# in .env:  BS_OPENAI_BASE_URL=http://ollama:11434/v1   BS_AI_MODEL=qwen3:14b
+docker compose up -d api
+```
+
+**Any other OpenAI-compatible server** (local vLLM / LM Studio / llama.cpp, or hosted
+OpenRouter, Groq, Together, Fireworks): set `BS_OPENAI_BASE_URL` to its `/v1` endpoint,
+`BS_OPENAI_API_KEY` if it needs one, and `BS_AI_MODEL` to the model id. Structured output falls
+back from `json_schema` to JSON mode automatically on servers that do not support schemas; PDF
+receipts are only read by the Anthropic provider (upload an image instead).
 
 ## API
 
