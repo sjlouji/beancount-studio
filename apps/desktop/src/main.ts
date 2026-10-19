@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, net, session, shell } from "electron";
 import log from "electron-log/main";
 
 import type { ConnectChannel, ConnectResult } from "./ipc";
@@ -21,7 +21,11 @@ let mainWindow: BrowserWindow | null = null;
 let serverOrigin: string | null = null;
 
 function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (!(error instanceof Error)) return String(error);
+  // Node and Chromium wrap network failures: "fetch failed" with the real reason in `cause`.
+  const cause = error.cause;
+  const reason = cause instanceof Error ? cause.message : typeof cause === "string" ? cause : "";
+  return reason ? `${error.message}: ${reason}` : error.message;
 }
 
 function isConnectPage(url: string): boolean {
@@ -66,7 +70,9 @@ async function loadServer(origin: string): Promise<void> {
 }
 
 async function checkServer(origin: string): Promise<void> {
-  const response = await fetch(healthUrl(origin), { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) });
+  // Chromium's network stack, not Node's fetch: it honours the operating system's trust store,
+  // so a locally trusted certificate authority (the `local` stack) is accepted like in a browser.
+  const response = await net.fetch(healthUrl(origin), { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) });
   if (!response.ok) {
     throw new Error(`${origin} answered HTTP ${response.status} on /api/healthz`);
   }
