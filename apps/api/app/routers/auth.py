@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, timedelta
 
 from fastapi import APIRouter, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 
 from app.core.deps import AuthDep, DbDep, SessionUserDep, SettingsDep, author_for
 from app.core.mailer import send_email
 from app.core.security import hash_password, hash_token, new_token, verify_password
-from app.db.models import Ledger, PasswordResetToken, Session, User, utcnow
+from app.db.models import DesktopSignIn, Ledger, PasswordResetToken, Session, User, utcnow
 from app.errors import (
     ConflictError,
     FeatureDisabledError,
@@ -22,6 +23,8 @@ from app.ledgers.store import get_store
 from app.logging_setup import get_logger
 from app.schemas import (
     ChangePasswordRequest,
+    DesktopApproveRequest,
+    DesktopExchangeRequest,
     ForgotPasswordRequest,
     LoginRequest,
     ResetPasswordRequest,
@@ -31,6 +34,9 @@ from app.schemas import (
 
 log = get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# How long a browser approval stays redeemable by the desktop app.
+DESKTOP_SIGN_IN_TTL = timedelta(minutes=5)
 
 
 def _set_session_cookie(response: Response, token: str, settings) -> None:
@@ -142,6 +148,50 @@ async def me(auth: AuthDep):
     if auth.user is None:
         raise UnauthorizedError("Not signed in")
     return UserOut.model_validate(auth.user)
+
+
+@router.post("/desktop/approve", status_code=204)
+async def approve_desktop_sign_in(body: DesktopApproveRequest, user: SessionUserDep, db: DbDep):
+    """The web app calls this after the person confirms the desktop app may sign in as them."""
+    row = await db.get(DesktopSignIn, body.challenge)
+    if row is None:
+        row = DesktopSignIn(challenge=body.challenge, user_id=user.id)
+        db.add(row)
+    else:
+        row.user_id = user.id
+    row.expires_at = utcnow() + DESKTOP_SIGN_IN_TTL
+    await db.commit()
+    log.info("desktop sign-in approved by %s", user.username)
+    return Response(status_code=204)
+
+
+@router.post("/desktop/exchange", response_model=None)
+async def exchange_desktop_sign_in(
+    body: DesktopExchangeRequest,
+    request: Request,
+    response: Response,
+    db: DbDep,
+    settings: SettingsDep,
+) -> UserOut | JSONResponse:
+    """The desktop app polls this with its verifier; 202 until the browser has approved."""
+    pending = JSONResponse({"status": "pending"}, status_code=202)
+    row = await db.get(DesktopSignIn, hash_token(body.verifier))
+    if row is None:
+        return pending
+    await db.delete(row)  # single use, whichever way this goes
+    await db.commit()
+    expires = row.expires_at if row.expires_at.tzinfo else row.expires_at.replace(tzinfo=UTC)
+    if expires < utcnow():
+        log.warning("desktop sign-in approval expired before the app exchanged it")
+        return pending
+    user = await db.get(User, row.user_id)
+    if user is None:
+        log.warning("desktop sign-in approval refers to a deleted user")
+        return pending
+    token = await create_session(db, user, request, settings)
+    _set_session_cookie(response, token, settings)
+    log.info("desktop app signed in as %s", user.username)
+    return UserOut.model_validate(user)
 
 
 @router.post("/change-password", status_code=204)

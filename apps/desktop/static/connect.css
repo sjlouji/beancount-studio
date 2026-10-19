@@ -10,6 +10,9 @@
   --border: #e6e6e6;
   --ring: #611f69;
   --destructive: #cc4117;
+  --accent: #f9f0ff;
+  --accent-foreground: #1d1d1d;
+  --link: #1264a3;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,6 +26,9 @@
     --border: #3a2740;
     --ring: #d9bdde;
     --destructive: #e8653d;
+    --accent: #3a2240;
+    --accent-foreground: #ffffff;
+    --link: #8ab4f8;
   }
 }
 
@@ -129,4 +135,28 @@ button:focus-visible {
 button:disabled {
   cursor: progress;
   opacity: 0.7;
+}
+
+button.secondary {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+button.secondary:hover,
+button.secondary:focus-visible {
+  background: var(--accent);
+  box-shadow: var(--ring) 0 0 0 2px;
+}
+
+button.link {
+  margin-top: 12px;
+  background: none;
+  color: var(--link);
+  font-weight: 600;
+}
+
+button.link:hover,
+button.link:focus-visible {
+  background: none;
+  text-decoration: underline;
 }

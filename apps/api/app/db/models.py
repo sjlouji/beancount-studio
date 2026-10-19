@@ -167,6 +167,22 @@ class ChatThread(TimestampMixin, Base):
     messages: Mapped[list] = mapped_column(JSON, default=list)  # assistant-ui ThreadMessageLike[]
 
 
+class DesktopSignIn(Base):
+    """A browser-approved sign-in waiting to be redeemed by the desktop app.
+
+    The app keeps a random verifier and sends only its SHA-256 (`challenge`) to the browser; the
+    signed-in person approves that challenge; the app then exchanges the verifier for a session.
+    Rows are single-use: deleted on exchange, or when found expired.
+    """
+
+    __tablename__ = "desktop_sign_ins"
+
+    challenge: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
 class Upload(Base):
     """A temporary upload (receipt image, statement) owned by a user."""
 

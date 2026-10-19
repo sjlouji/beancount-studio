@@ -12,28 +12,42 @@
   <body>
     <main class="card">
       <p class="eyebrow">Beancount Studio</p>
-      <h1>Connect to your server</h1>
-      <p class="lede">
-        Enter the address of the Beancount Studio instance you use. You sign in there, in this
-        window, and the app remembers the server.
-      </p>
-      <form id="connect-form" novalidate>
-        <label for="server-url">Server address</label>
-        <input
-          id="server-url"
-          name="url"
-          type="text"
-          inputmode="url"
-          autocomplete="url"
-          autocapitalize="off"
-          spellcheck="false"
-          placeholder="studio.example.com"
-          autofocus
-          required
-        />
-        <p id="error" class="error" role="alert" hidden></p>
-        <button type="submit" id="connect-button">Connect</button>
-      </form>
+
+      <section id="connect">
+        <h1>Connect to your server</h1>
+        <p class="lede">
+          Enter the address of the Beancount Studio instance you use. You sign in to it in your
+          browser, and the app remembers the server.
+        </p>
+        <form id="connect-form" novalidate>
+          <label for="server-url">Server address</label>
+          <input
+            id="server-url"
+            name="url"
+            type="text"
+            inputmode="url"
+            autocomplete="url"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="studio.example.com"
+            autofocus
+            required
+          />
+          <p id="error" class="error" role="alert" hidden></p>
+          <button type="submit" id="connect-button">Connect</button>
+        </form>
+      </section>
+
+      <section id="waiting" hidden>
+        <h1>Finish signing in in your browser</h1>
+        <p class="lede">
+          We opened <span id="waiting-server"></span> in your browser. Sign in there and approve
+          the request; this window continues on its own.
+        </p>
+        <p id="waiting-error" class="error" role="alert" hidden></p>
+        <button type="button" id="reopen-button" class="secondary">Open the browser again</button>
+        <button type="button" id="cancel-button" class="link">Use a different server</button>
+      </section>
     </main>
     <script src="connect.js"></script>
   </body>

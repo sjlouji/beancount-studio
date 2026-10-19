@@ -40,6 +40,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class DesktopApproveRequest(BaseModel):
+    challenge: str = Field(
+        pattern=r"^[0-9a-f]{64}$", description="SHA-256 hex of the desktop app's verifier"
+    )
+
+
+class DesktopExchangeRequest(BaseModel):
+    verifier: str = Field(min_length=32, max_length=128)
+
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 

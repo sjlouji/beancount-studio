@@ -15,8 +15,14 @@ client already carries every feature, so duplicating UI in a second stack is not
 hardened window. It does not bundle the web client and it does not embed the API.
 
 - **Server first.** On first launch the shell asks for a server address, checks
-  `/api/healthz`, saves the origin and loads it. Sign-in happens on the server's own pages; the
-  session cookie lives in Electron's persistent session.
+  `/api/healthz`, saves the origin and loads it.
+- **Sign-in happens in the browser** (amended 2026-10-19). The shell never shows a login form.
+  It opens the server's `/desktop/sign-in` page in the default browser with the SHA-256 of a
+  secret it keeps; the person signs in there and approves; the shell redeems the secret at
+  `/api/auth/desktop/exchange` for a session cookie in its own cookie jar. Approvals are
+  single-use and expire after five minutes. A `beancount-studio://signed-in` deep link brings
+  the window back in packaged builds; the shell also polls, so development builds work without
+  the scheme. Any navigation to the server's own sign-in pages restarts the browser flow.
 - **Hardened by default.** Context isolation and the sandbox are on, Node integration is off.
   Navigation is limited to the connected server's origin and the shell's own connect screen;
   every other link opens in the default browser. `<webview>` is blocked. Only notifications,

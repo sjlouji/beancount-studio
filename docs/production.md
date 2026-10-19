@@ -99,8 +99,9 @@ Results land in `apps/desktop/release/`, for example `Beancount Studio-0.1.0-arm
 
 Open the dmg and drag Beancount Studio into Applications. On first launch the app asks for a
 server address: `https://localhost:8443` for the laptop stack after the trust step, or
-`https://<DOMAIN>` for a server. It checks the address, remembers it and loads the server's
-sign-in page.
+`https://<DOMAIN>` for a server. It checks the address and remembers it, then opens your default
+browser to sign in. Sign in there, approve "Sign in to the desktop app", and return to the app;
+it picks up the session on its own. There is no login form inside the app.
 
 To change servers, quit the app and remove
 `~/Library/Application Support/beancount-studio-desktop/settings.json`, or launch once with

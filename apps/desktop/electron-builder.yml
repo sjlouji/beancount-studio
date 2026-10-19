@@ -10,6 +10,10 @@ files:
   - "!dist/**/*.test.js"
   - "!dist/**/*.test.js.map"
   - static/**/*
+# Registers beancount-studio:// so the browser can hand sign-in back to the app.
+protocols:
+  - name: Beancount Studio
+    schemes: [beancount-studio]
 mac:
   category: public.app-category.finance
   hardenedRuntime: true

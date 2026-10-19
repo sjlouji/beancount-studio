@@ -58,10 +58,25 @@ async def test_migrations_produce_exactly_the_model_schema(tmp_path: Path):
     await engine.dispose()
 
 
+# The tables that existed before migrations were introduced; a legacy database has exactly these.
+LEGACY_TABLES = (
+    "users",
+    "sessions",
+    "password_reset_tokens",
+    "ledgers",
+    "ledger_collaborators",
+    "ledger_stars",
+    "api_keys",
+    "chat_threads",
+    "uploads",
+)
+
+
 async def test_database_created_before_migrations_is_stamped_not_recreated(tmp_path: Path):
     engine = _engine(tmp_path, "legacy.db")
+    legacy = [Base.metadata.tables[name] for name in LEGACY_TABLES]
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(lambda sync: Base.metadata.create_all(sync, tables=legacy))
     async with engine.begin() as conn:
         await conn.execute(
             sa.text(

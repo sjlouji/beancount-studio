@@ -87,6 +87,13 @@ export function useSystemInfo() {
   return useQuery<SystemInfo>({ queryKey: keys.system, queryFn: () => apiGet<SystemInfo>("/system/info"), staleTime: 10 * 60_000 });
 }
 
+/** Approves a desktop-app sign-in for the hash the app sent to the browser. */
+export function useApproveDesktopSignIn() {
+  return useMutation({
+    mutationFn: (body: { challenge: string }) => apiPost<void>("/auth/desktop/approve", body),
+  });
+}
+
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation({

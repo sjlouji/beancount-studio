@@ -71,6 +71,15 @@ clipboard writes and fullscreen are granted to the server origin. The preload ex
 `window.studioDesktop` with the shell version and platform; the web client treats its absence
 as "running in a browser".
 
+**Sign-in is handed off to the browser**, as Slack does it. The shell keeps a random secret and
+opens the server's `/desktop/sign-in` page in the default browser with only the secret's SHA-256.
+The person signs in there, sees which account the app wants to use, and approves. The shell polls
+`/api/auth/desktop/exchange` with its secret and receives the session cookie into its own cookie
+jar, then loads the server already signed in. Approvals are single-use and expire after five
+minutes; the exchange answers 202 until one exists. In packaged builds the browser also opens
+`beancount-studio://signed-in`, which brings the window to the front. Any navigation to the
+server's own login or sign-up pages, for example after signing out, restarts this flow.
+
 ## Deployment topology
 
 Every mode is a Docker Compose stack in `deploy/`, driven by `./studio.sh`:
