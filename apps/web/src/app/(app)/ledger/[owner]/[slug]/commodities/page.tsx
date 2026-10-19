@@ -61,7 +61,7 @@ export default function CommoditiesPage() {
         </div>
       )}
 
-      <section className="animate-rise overflow-hidden rounded-xl border bg-card card-elevated [animation-delay:120ms]">
+      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:120ms]">
         <header className="border-b px-4 py-2.5">
           <h2 className="text-sm font-medium">Declared commodities</h2>
         </header>

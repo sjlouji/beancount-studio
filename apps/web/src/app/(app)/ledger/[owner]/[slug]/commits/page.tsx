@@ -95,7 +95,7 @@ export default function CommitsPage() {
         />
       ) : (
         <>
-          <ol className="animate-rise divide-y overflow-hidden rounded-xl border bg-card card-elevated [animation-delay:80ms]">
+          <ol className="animate-rise divide-y overflow-hidden rounded-xl border bg-card [animation-delay:80ms]">
             {items.map((commit) => (
               <li key={commit.sha}>
                 <Link href={`${base}/commit/${commit.sha}`} className="flex items-center gap-4 px-4 py-3 outline-none transition-colors hover:bg-muted/60 focus-visible:bg-muted/60">

@@ -64,7 +64,7 @@ export function NewLedgerDialog({ open, onOpenChange }: { open: boolean; onOpenC
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={onSubmit}>
           <DialogHeader>
-            <DialogTitle className="font-heading text-2xl">New ledger</DialogTitle>
+            <DialogTitle className="type-heading-lg">New ledger</DialogTitle>
             <DialogDescription>A ledger is a git repository of plain-text Beancount files.</DialogDescription>
           </DialogHeader>
           <FieldGroup className="my-6">

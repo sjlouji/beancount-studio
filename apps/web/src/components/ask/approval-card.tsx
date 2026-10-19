@@ -96,7 +96,7 @@ export function ApprovalCard({ args, result, status, addResult }: ToolCallMessag
   const approved = decided && result?.approved === true;
 
   return (
-    <div className={cn("my-2 overflow-hidden rounded-xl border bg-card card-elevated", approved && "border-positive/40", decided && !approved && "border-muted")}>
+    <div className={cn("my-2 overflow-hidden rounded-xl border bg-card", approved && "border-positive/40", decided && !approved && "border-muted")}>
       <div className="flex items-start gap-3 border-b bg-surface/60 px-4 py-3">
         <div className={cn("mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg", approved ? "bg-positive/15 text-positive" : "bg-primary/12 text-primary")}>
           {approved ? <CheckIcon className="size-4" /> : <FileDiffIcon className="size-4" />}

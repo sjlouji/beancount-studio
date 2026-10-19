@@ -87,7 +87,7 @@ export function CommitStep({ state, dispatch, onBack, onReset }: { state: Wizard
 
   if (result) {
     return (
-      <section className="space-y-5 rounded-xl border bg-card p-6 card-elevated animate-rise">
+      <section className="space-y-5 rounded-xl border bg-card p-6 animate-rise">
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-positive/10 text-positive">
             <CheckCircle2Icon className="size-5" />
@@ -143,7 +143,7 @@ export function CommitStep({ state, dispatch, onBack, onReset }: { state: Wizard
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border bg-card p-5 card-elevated animate-rise">
+      <section className="rounded-xl border bg-card p-5 animate-rise">
         <h2 className="text-sm font-medium">Summary</h2>
         <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Stat label="Transactions">{included.length}</Stat>
@@ -162,7 +162,7 @@ export function CommitStep({ state, dispatch, onBack, onReset }: { state: Wizard
         </p>
       </section>
 
-      <section className="grid gap-4 rounded-xl border bg-card p-5 card-elevated animate-rise [animation-delay:60ms] md:grid-cols-2">
+      <section className="grid gap-4 rounded-xl border bg-card p-5 animate-rise [animation-delay:60ms] md:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="target-file">Target file</Label>
           <Select value={chosenFile} onValueChange={setFilename}>

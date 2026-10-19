@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 /** The visible icon follows the `.dark` class via CSS, so no hydration-sensitive state is needed. */
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({ className, tone = "default" }: { className?: string; tone?: "default" | "onAubergine" }) {
   const { resolvedTheme, setTheme } = useTheme();
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          variant="ghost"
+          variant={tone === "onAubergine" ? "ghost-on-aubergine" : "ghost"}
           size="icon-sm"
           className={className}
           aria-label="Toggle theme"

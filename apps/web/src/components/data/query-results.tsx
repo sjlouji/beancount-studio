@@ -57,7 +57,7 @@ function ResultTable({ result }: { result: QueryTableResult }) {
     });
 
   return (
-    <section className="overflow-hidden rounded-xl border bg-card card-elevated">
+    <section className="overflow-hidden rounded-xl border bg-card">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
         <p className="text-sm text-muted-foreground">
           <span className="tabular font-medium text-foreground">{result.rowCount.toLocaleString()}</span> {result.rowCount === 1 ? "row" : "rows"}
@@ -118,7 +118,7 @@ function ResultTable({ result }: { result: QueryTableResult }) {
 export function QueryResultView({ result }: { result: QueryResult }) {
   if (result.type === "text") {
     return result.contents.trim() ? (
-      <pre className="overflow-auto rounded-xl border bg-card p-4 font-mono text-xs leading-relaxed card-elevated">{result.contents}</pre>
+      <pre className="overflow-auto rounded-xl border bg-card p-4 font-mono text-xs leading-relaxed">{result.contents}</pre>
     ) : (
       <EmptyState title="Nothing to show" description="The query produced no output." />
     );

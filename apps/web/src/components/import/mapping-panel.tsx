@@ -38,7 +38,7 @@ export function MappingPanel({
   dirty: boolean;
 }) {
   return (
-    <section className="rounded-xl border bg-card p-5 card-elevated animate-rise [animation-delay:60ms]">
+    <section className="rounded-xl border bg-card p-5 animate-rise [animation-delay:60ms]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-medium">Column mapping</h2>

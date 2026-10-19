@@ -8,10 +8,10 @@ import { Spinner } from "@/components/ui/spinner";
 export function AuthCard({ title, subtitle, children, footer }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode }) {
   return (
     <div>
-      <h1 className="font-heading text-4xl leading-none tracking-tight">{title}</h1>
-      {subtitle && <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>}
+      <h1 className="type-display-md">{title}</h1>
+      {subtitle && <p className="mt-2 type-body-md text-muted-foreground">{subtitle}</p>}
       <div className="mt-8">{children}</div>
-      {footer && <div className="mt-6 text-center text-sm text-muted-foreground">{footer}</div>}
+      {footer && <div className="mt-6 text-center type-caption text-muted-foreground">{footer}</div>}
     </div>
   );
 }
@@ -28,7 +28,7 @@ export function SubmitButton({ children, pending }: { children: ReactNode; pendi
 export function FormError({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <p role="alert" className="rounded-lg border border-negative/30 bg-negative/8 px-3 py-2 text-sm text-negative">
+    <p role="alert" className="rounded-sm border border-destructive/40 bg-destructive/8 px-3 py-2 text-sm text-destructive">
       {message}
     </p>
   );
@@ -36,7 +36,7 @@ export function FormError({ message }: { message: string | null }) {
 
 export function AuthLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="font-medium text-primary underline-offset-4 hover:underline">
+    <Link href={href} className="link font-semibold">
       {children}
     </Link>
   );

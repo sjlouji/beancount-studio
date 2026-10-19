@@ -20,10 +20,10 @@ function LedgerCard({ ledger, index }: { ledger: Ledger; index: number }) {
       className="group block animate-rise outline-none"
       style={{ animationDelay: `${index * 40}ms` }}
     >
-      <Card className="h-full transition-all group-hover:-translate-y-0.5 group-hover:shadow-float group-focus-visible:ring-3 group-focus-visible:ring-ring/50">
+      <Card className="h-full transition-all group-hover:-translate-y-0.5 group-hover:border-primary/40 group-focus-visible:ring-3 group-focus-visible:ring-ring/50">
         <CardContent className="flex h-full flex-col gap-3">
           <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/12 font-heading text-xl text-primary">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-secondary text-lg font-bold text-primary">
               {ledger.title.slice(0, 1).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
@@ -129,9 +129,9 @@ export default function LedgersPage() {
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,1.4fr)]">
-        <Card className="animate-rise [animation-delay:120ms] bg-surface/60">
+        <Card variant="cream" className="animate-rise [animation-delay:120ms]">
           <CardContent className="space-y-3 text-sm">
-            <h2 className="font-medium">Good to know</h2>
+            <h2 className="type-heading-sm">Good to know</h2>
             <ul className="space-y-2 text-muted-foreground">
               <li>Press <kbd className="rounded border bg-background px-1 font-mono text-xs">⌘K</kbd> inside a ledger to jump anywhere.</li>
               <li>Every edit becomes a commit — open History on any ledger to see diffs and roll things back by hand.</li>

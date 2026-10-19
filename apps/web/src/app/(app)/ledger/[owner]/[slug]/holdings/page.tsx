@@ -56,7 +56,7 @@ export default function HoldingsPage() {
           <p className="text-xs text-muted-foreground">{group.hint}</p>
         </div>
       </Tabs>
-      <section className={cn("animate-rise overflow-hidden rounded-xl border bg-card card-elevated transition-opacity [animation-delay:120ms]", query.isFetching && "opacity-70")} aria-label={`Holdings ${group.label.toLowerCase()}`}>
+      <section className={cn("animate-rise overflow-hidden rounded-xl border bg-card transition-opacity [animation-delay:120ms]", query.isFetching && "opacity-70")} aria-label={`Holdings ${group.label.toLowerCase()}`}>
         {result.type === "text" ? (
           <pre className="overflow-auto p-4 font-mono text-xs">{result.contents}</pre>
         ) : result.rows.length === 0 ? (

@@ -363,7 +363,7 @@ function EditorView({ path, line }: { path: string; line?: number }) {
         </Alert>
       )}
 
-      <div className="animate-rise overflow-hidden rounded-xl border bg-card card-elevated [animation-delay:60ms]">
+      <div className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:60ms]">
         <div className="h-[calc(100dvh-20rem)] min-h-[360px]">
           <Editor
             path={path}

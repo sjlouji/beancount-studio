@@ -58,7 +58,7 @@ export function useEventTypes(owner: string, slug: string, events: Entry[] | und
 export function EventTimeline({ type, events, onOpen }: { type: string; events: Entry[]; onOpen: (entryHash: string) => void }) {
   return (
     <Collapsible defaultOpen asChild>
-      <section className="rounded-xl border bg-card card-elevated">
+      <section className="rounded-xl border bg-card">
         <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-xl px-4 py-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
           <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
           <h2 className="text-sm font-medium">{type}</h2>

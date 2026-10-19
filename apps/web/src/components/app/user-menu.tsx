@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLogout, useMe } from "@/lib/api/hooks";
+import { cn } from "@/lib/utils";
 
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -22,12 +23,13 @@ export function initialsOf(name: string): string {
   return `${parts[0]![0]}${parts[parts.length - 1]![0]}`.toUpperCase();
 }
 
-export function UserMenu() {
+export function UserMenu({ tone = "default" }: { tone?: "default" | "onAubergine" }) {
   const { data: me } = useMe();
   const logout = useLogout();
+  const onAubergine = tone === "onAubergine";
   if (!me) {
     return (
-      <Button asChild size="sm" variant="outline">
+      <Button asChild size="sm" variant={onAubergine ? "outline-on-aubergine" : "outline"}>
         <Link href="/login">Sign in</Link>
       </Button>
     );
@@ -35,9 +37,9 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2 pl-1.5">
-          <Avatar className="size-6">
-            <AvatarFallback className="bg-primary/15 text-[10px] font-semibold text-primary">
+        <Button variant={onAubergine ? "ghost-on-aubergine" : "ghost"} size="sm" className="gap-2 pl-1.5">
+          <Avatar className="size-6 rounded-md">
+            <AvatarFallback className={cn("rounded-md text-[10px] font-bold", onAubergine ? "bg-sidebar-foreground text-primary" : "bg-secondary text-primary")}>
               {initialsOf(me.displayName || me.username)}
             </AvatarFallback>
           </Avatar>
@@ -46,7 +48,7 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col">
-          <span className="truncate font-medium">{me.displayName || me.username}</span>
+          <span className="truncate font-semibold">{me.displayName || me.username}</span>
           <span className="truncate text-xs font-normal text-muted-foreground">{me.email}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

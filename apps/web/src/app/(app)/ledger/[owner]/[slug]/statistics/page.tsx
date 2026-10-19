@@ -123,7 +123,7 @@ export default function StatisticsPage() {
         </Card>
       </div>
 
-      <section className="animate-rise overflow-hidden rounded-xl border bg-card card-elevated [animation-delay:160ms]" aria-labelledby="last-entries">
+      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:160ms]" aria-labelledby="last-entries">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2.5">
           <h3 id="last-entries" className="text-sm font-medium">
             Last entry per account

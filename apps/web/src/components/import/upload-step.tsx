@@ -75,7 +75,7 @@ export function UploadStep({
 
       {statement && mapping && (
         <>
-          <section className="rounded-xl border bg-card p-5 card-elevated animate-rise">
+          <section className="rounded-xl border bg-card p-5 animate-rise">
             <div className="flex items-center gap-2 text-sm font-medium">
               <FileTextIcon className="size-4 text-muted-foreground" />
               <span className="truncate">{statement.filename}</span>

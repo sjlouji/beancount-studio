@@ -1,3 +1,6 @@
+> **Design system:** [`DESIGN.md`](../DESIGN.md) at the repo root defines colours, type,
+> shapes and components. This file covers app-specific patterns; `DESIGN.md` wins on conflicts.
+
 # Frontend conventions (apps/web)
 
 Next.js 16 App Router · React 19 · TypeScript · Tailwind v4 · shadcn/ui (radix-nova preset) · TanStack Query · Recharts · assistant-ui.
@@ -74,12 +77,37 @@ export default function Page() {
 
 ## Design rules
 
-- Fonts are set globally: sans (IBM Plex Sans), mono (IBM Plex Mono) for account names/source, heading serif only on `h1` (PageHeader). Don't add fonts.
-- Colours only through tokens: `text-muted-foreground`, `bg-card`, `text-positive`, `text-negative`, `text-warning`, `bg-surface`, `chart-1…8`. Never raw hex in components.
-- Cards: `rounded-xl border bg-card card-elevated` (or shadcn `Card`). Section titles inside cards: `text-sm font-medium`.
+`DESIGN.md` is the system; these are the app-specific applications of it.
+
+- Fonts are set globally: Inter for everything (the display and UI tiers), IBM Plex Mono for
+  account names and ledger source. No serif, no other fonts. Type tiers are utilities:
+  `type-display-xxl|xl|lg|md`, `type-heading-lg|md|sm`, `type-body-lg|md|strong`, `type-caption`,
+  `type-micro-cap` (uppercase eyebrows and section labels).
+- Colours only through tokens: `bg-primary` (aubergine, filled CTAs only), `bg-secondary` /
+  `bg-accent` (lavender), `bg-muted` / `bg-canvas-cream` (cream bands), `border` (hairline),
+  `text-muted-foreground` (ink mute), `text-link`, `text-positive` / `text-negative` (success /
+  error), `text-warning` (a semantic extension for pending states), `chart-1…8`. The aubergine
+  frame uses `bg-sidebar`, `text-sidebar-foreground`, `text-sidebar-muted`, `bg-sidebar-accent`.
+  Never raw hex in components.
+- Buttons: every button is a pill. `size="lg"` is the standard 16px / 14×28 pill, reserved for
+  the one filled aubergine CTA per view (PageHeader actions, submit buttons). `default`, `sm`,
+  `xs` are the compact pills for toolbars and tables. `secondary` is the lavender pill, `outline`
+  the 2px aubergine outline. On the aubergine frame use `outline-on-aubergine` /
+  `ghost-on-aubergine`.
+- Inline links: the `link` utility (link blue, underline on hover). Never aubergine text links.
+- Cards: `rounded-xl border bg-card` or shadcn `Card` (flat, hairline border, no shadow).
+  `Card variant="cream"` for feature bands, `variant="aubergine"` for closing CTA bands.
+  Section titles inside cards: `text-base font-semibold`.
+- Stat tiles: numerals in `type-display-md text-primary` on white ({card-stat}).
+- Elevation: cards and tables are flat. `shadow-sm` / `shadow-md` / `shadow-lg` map to DESIGN.md
+  levels 1–3 and are reserved for floating chrome (menus, dialogs, toasts, tooltips).
+- Radii: inputs 4px (`rounded-sm`), menus 8px (`rounded-md`), panes 12px (`rounded-lg`), cards
+  16px (`rounded-xl`), buttons and badges `rounded-full`.
+- Public and hero surfaces (auth pages, gallery band) use the `pastel-mesh` backdrop and the
+  aubergine band; data pages stay on plain canvas.
 - Numbers: always `tabular` (utility class) in tables and lists; `formatNumber(value, precisions[currency] ?? 2)`.
 - Entrance motion: `animate-rise` on top-level blocks with staggered `[animation-delay:…ms]`. Nothing else should animate on load.
-- Dark mode must work automatically (tokens) — test by toggling the theme button.
+- Dark mode is derived from the aubergine surface tokens and must work automatically — test by toggling the theme button.
 - Responsive: grids collapse to one column below `lg`; tables may scroll horizontally inside `overflow-x-auto`.
 - Empty states say what to do next (link to Import, Editor, Ask).
 - Accessibility: every icon-only button has `aria-label`; tables have header rows; interactive rows are buttons or links.
@@ -87,5 +115,5 @@ export default function Page() {
 ## Tooling
 
 - `pnpm exec tsc --noEmit` and `pnpm lint` must pass. No new dependencies (Monaco is already installed: `@monaco-editor/react`).
-- Do not edit `src/lib/api/hooks.ts`, `types.ts`, `components/ui/*`, `components/assistant-ui/*`, or another page group's files. If a hook is missing, write a local `useQuery` with `apiGet` inside your page/component files.
+- Do not edit `src/lib/api/hooks.ts`, `types.ts`, or another page group's files. `components/ui/*` and `components/assistant-ui/*` are themed to `DESIGN.md`; change them only to keep them on the system. If a hook is missing, write a local `useQuery` with `apiGet` inside your page/component files.
 - The local shell guard blocks commands containing the words `truncate ` or `drop database`; write files with the Write tool, not heredocs.

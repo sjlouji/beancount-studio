@@ -27,7 +27,7 @@ export function StatementSummary({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-xl border bg-card card-elevated", className)}>
+    <section className={cn("rounded-xl border bg-card", className)}>
       <header className="border-b px-4 py-2.5">
         <h3 className="text-sm font-medium">{title}</h3>
       </header>

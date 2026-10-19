@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Brand } from "@/components/app/brand";
 import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
@@ -97,7 +96,7 @@ export function LedgerSidebar() {
           label: "Errors",
           path: "/errors",
           icon: TriangleAlertIcon,
-          badge: errors > 0 ? <SidebarMenuBadge className="bg-negative/15 text-negative">{errors}</SidebarMenuBadge> : undefined,
+          badge: errors > 0 ? <SidebarMenuBadge className="bg-destructive text-white">{errors}</SidebarMenuBadge> : undefined,
         },
       ],
     },
@@ -119,16 +118,13 @@ export function LedgerSidebar() {
 
   return (
     <Sidebar collapsible="icon" variant="inset">
-      <SidebarHeader className="gap-3">
-        <div className="flex items-center justify-between px-1 group-data-[collapsible=icon]:justify-center">
-          <Brand compact />
-          {ledger.visibility === "public" && (
-            <Badge variant="outline" className="group-data-[collapsible=icon]:hidden">
-              Public
-            </Badge>
-          )}
-        </div>
+      <SidebarHeader className="gap-2 border-b border-sidebar-border pb-3">
         <LedgerSwitcher />
+        {ledger.visibility === "public" && (
+          <Badge variant="outline" className="ml-2 w-fit border-sidebar-border text-sidebar-muted group-data-[collapsible=icon]:hidden">
+            Public
+          </Badge>
+        )}
       </SidebarHeader>
       <SidebarContent className="scrollbar-thin">
         {groups.map((group) => {
@@ -136,12 +132,17 @@ export function LedgerSidebar() {
           if (items.length === 0) return null;
           return (
             <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupLabel className="font-bold uppercase tracking-[0.96px] text-sidebar-muted">{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {items.map((item) => (
                     <SidebarMenuItem key={item.path}>
-                      <SidebarMenuButton asChild isActive={isActive(item)} tooltip={item.label}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(item)}
+                        tooltip={item.label}
+                        className="text-sidebar-muted hover:text-sidebar-foreground data-[active=true]:bg-sidebar-primary data-[active=true]:font-bold data-[active=true]:text-sidebar-primary-foreground"
+                      >
                         <Link href={`${base}${item.path}${queryString}`}>
                           <item.icon />
                           <span>{item.label}</span>
@@ -158,19 +159,19 @@ export function LedgerSidebar() {
       </SidebarContent>
       <SidebarFooter className="group-data-[collapsible=icon]:hidden">
         {meta && (
-          <div className="rounded-lg border bg-surface/60 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+          <div className="rounded-lg bg-sidebar-accent px-3 py-2 text-[11px] leading-relaxed text-sidebar-muted">
             <div className="flex justify-between">
               <span>Transactions</span>
-              <span className="tabular text-foreground">{meta.transactionsCount.toLocaleString()}</span>
+              <span className="tabular text-sidebar-foreground">{meta.transactionsCount.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span>Accounts</span>
-              <span className="tabular text-foreground">{meta.accountsCount}</span>
+              <span className="tabular text-sidebar-foreground">{meta.accountsCount}</span>
             </div>
             {meta.lastTransactionDate && (
               <div className="flex justify-between">
                 <span>Last entry</span>
-                <span className="tabular text-foreground">{meta.lastTransactionDate}</span>
+                <span className="tabular text-sidebar-foreground">{meta.lastTransactionDate}</span>
               </div>
             )}
           </div>

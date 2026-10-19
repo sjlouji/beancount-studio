@@ -105,10 +105,10 @@ function Welcome() {
   const { data: info } = useSystemInfo();
   return (
     <div className="flex flex-col items-center gap-3 py-10 text-center animate-rise">
-      <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+      <div className="flex size-12 items-center justify-center rounded-xl bg-secondary text-primary">
         <SparklesIcon className="size-6" />
       </div>
-      <h2 className="font-heading text-3xl">Ask about {ledger.title}</h2>
+      <h2 className="type-display-md">Ask about {ledger.title}</h2>
       <p className="max-w-md text-sm text-muted-foreground">
         It can run queries, read your files and reports, and {canWrite ? "propose edits that you approve before anything is written" : "draft entries you can add yourself"}. Attach a receipt or statement to turn it into entries.
       </p>

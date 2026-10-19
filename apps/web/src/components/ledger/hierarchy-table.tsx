@@ -89,7 +89,7 @@ export function HierarchyTable({
   const collapseAll = () => setExpanded(new Set([root.account]));
 
   return (
-    <section className={cn("overflow-hidden rounded-xl border bg-card card-elevated", className)} aria-labelledby={headingId}>
+    <section className={cn("overflow-hidden rounded-xl border bg-card", className)} aria-labelledby={headingId}>
       <header className="flex items-center justify-between gap-3 border-b px-4 py-2.5">
         <h3 id={headingId} className="text-sm font-medium">
           {title}

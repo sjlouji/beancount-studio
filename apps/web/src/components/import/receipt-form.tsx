@@ -43,7 +43,7 @@ function Field({ label, htmlFor, children, className }: { label: string; htmlFor
 /** Shimmering placeholder shown while the model reads the receipt. */
 export function ReadingReceipt() {
   return (
-    <div role="status" aria-live="polite" className="space-y-4 rounded-xl border bg-card p-5 card-elevated">
+    <div role="status" aria-live="polite" className="space-y-4 rounded-xl border bg-card p-5">
       <div className="shimmer flex items-center gap-2 text-sm font-medium text-muted-foreground motion-reduce:animate-none">
         <Spinner className="size-4" /> Reading receipt…
       </div>
@@ -74,7 +74,7 @@ export function ReceiptForm({
   const set = <K extends keyof ReceiptFormValues>(key: K) => (value: ReceiptFormValues[K]) => onChange({ [key]: value });
   return (
     <form
-      className="space-y-4 rounded-xl border bg-card p-5 card-elevated"
+      className="space-y-4 rounded-xl border bg-card p-5"
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit();

@@ -19,7 +19,7 @@ export function PriceCard({ pair, name, precisions, delay = 0 }: { pair: Pair; n
   const tone = change > 0 ? "text-positive" : change < 0 ? "text-negative" : "text-muted-foreground";
 
   return (
-    <article className="animate-rise rounded-xl border bg-card p-4 card-elevated" style={{ animationDelay: `${delay}ms` }}>
+    <article className="animate-rise rounded-xl border bg-card p-4" style={{ animationDelay: `${delay}ms` }}>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-medium">

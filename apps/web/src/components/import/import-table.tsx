@@ -75,7 +75,7 @@ export function ImportTable({
   const someSelected = !allSelected && views.some((v) => selected.has(v.row.id));
 
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card card-elevated">
+    <div className="overflow-x-auto rounded-xl border bg-card">
       <Table className="min-w-[1080px]">
         <TableHeader>
           <TableRow>

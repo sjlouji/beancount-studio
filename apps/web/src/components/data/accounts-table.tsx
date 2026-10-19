@@ -131,7 +131,7 @@ export function AccountsTable({
     });
 
   return (
-    <section className="overflow-hidden rounded-xl border bg-card card-elevated">
+    <section className="overflow-hidden rounded-xl border bg-card">
       {mode === "tree" && (
         <header className="flex items-center justify-end gap-1 border-b px-3 py-1.5">
           <Button variant="ghost" size="xs" onClick={() => setCollapsed(new Set())}>

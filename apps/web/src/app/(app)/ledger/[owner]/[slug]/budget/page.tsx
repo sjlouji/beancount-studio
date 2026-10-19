@@ -110,7 +110,7 @@ export default function BudgetPage() {
         }))}
       />
 
-      <section className="animate-rise overflow-hidden rounded-xl border bg-card card-elevated [animation-delay:120ms]" aria-labelledby="budget-entries">
+      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:120ms]" aria-labelledby="budget-entries">
         <header className="border-b px-4 py-2.5">
           <h3 id="budget-entries" className="text-sm font-medium">
             Budget directives

@@ -125,7 +125,7 @@ export default function FilesPage() {
           }
         />
       ) : (
-        <div className="animate-rise overflow-hidden rounded-xl border bg-card card-elevated [animation-delay:120ms]">
+        <div className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:120ms]">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

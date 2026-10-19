@@ -39,7 +39,9 @@ pnpm exec tsc --noEmit && pnpm lint && pnpm build
 - Ledger content is never stored in the database — only metadata (users, ledgers, collaborators,
   keys, chat threads, uploads).
 - Keep REST payload shapes in sync with `apps/web/src/lib/api/types.ts`.
-- UI: tokens only (no raw colours), tabular numbers, h1 only through `PageHeader`, every state
-  (pending/error/empty) handled. See `docs/frontend-conventions.md`.
+- UI: `DESIGN.md` is the design system (aubergine primary, pill buttons, Inter, cream/lavender
+  surfaces, link blue). Tokens only (no raw colours), tabular numbers, h1 only through
+  `PageHeader`, every state (pending/error/empty) handled. `docs/frontend-conventions.md` holds
+  the app-specific patterns; where it conflicts with `DESIGN.md`, `DESIGN.md` wins.
 - Tests: API changes need a pytest in `apps/api/tests`; run the full suite before finishing.
 - Secrets live in `.env` files (gitignored). Commit only `.env.example`.

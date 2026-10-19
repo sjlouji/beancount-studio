@@ -71,7 +71,7 @@ export default function CommitPage({ params }: { params: Promise<{ sha: string }
         }
       />
 
-      <div className="animate-rise rounded-xl border bg-card p-5 card-elevated [animation-delay:80ms]">
+      <div className="animate-rise rounded-xl border bg-card p-5 [animation-delay:80ms]">
         {body && <p className="mb-4 whitespace-pre-wrap text-sm text-muted-foreground">{body}</p>}
         <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
@@ -109,7 +109,7 @@ export default function CommitPage({ params }: { params: Promise<{ sha: string }
         <EmptyState icon={<GitCommitHorizontalIcon />} title="This commit changed no files" description="Empty commits only record a message." />
       ) : (
         <>
-          <section aria-labelledby="changed-files" className="animate-rise rounded-xl border bg-card card-elevated [animation-delay:120ms]">
+          <section aria-labelledby="changed-files" className="animate-rise rounded-xl border bg-card [animation-delay:120ms]">
             <div className="flex flex-wrap items-baseline gap-x-3 border-b px-4 py-2.5">
               <h2 id="changed-files" className="text-sm font-medium">
                 {pluralize(data.files.length, "file")} changed

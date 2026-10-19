@@ -24,7 +24,7 @@ function externalHref(website: string): string {
 function LedgerCard({ ledger, index }: { ledger: ProfileLedger; index: number }) {
   return (
     <Link href={`/ledger/${ledger.owner}/${ledger.slug}`} className="group block animate-rise outline-none" style={{ animationDelay: `${index * 40}ms` }}>
-      <Card className="h-full transition-all group-hover:-translate-y-0.5 group-hover:shadow-float group-focus-visible:ring-3 group-focus-visible:ring-ring/50">
+      <Card className="h-full transition-all group-hover:-translate-y-0.5 group-hover:border-primary/40 group-focus-visible:ring-3 group-focus-visible:ring-ring/50">
         <CardContent className="flex h-full flex-col gap-2">
           <div className="flex items-start justify-between gap-2">
             <h3 className="min-w-0 truncate font-medium">{ledger.title}</h3>

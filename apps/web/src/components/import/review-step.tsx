@@ -77,7 +77,7 @@ export function ReviewStep({
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-4 rounded-xl border bg-card p-5 card-elevated animate-rise md:grid-cols-[minmax(0,1fr)_9rem_auto] md:items-end">
+      <section className="grid gap-4 rounded-xl border bg-card p-5 animate-rise md:grid-cols-[minmax(0,1fr)_9rem_auto] md:items-end">
         <div className="space-y-1.5">
           <Label htmlFor="source-account">Source account</Label>
           <AccountCombobox

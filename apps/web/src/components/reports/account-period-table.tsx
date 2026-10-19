@@ -61,7 +61,7 @@ export function AccountPeriodTable({ report, interval, inverted }: { report: Acc
   if (periods.length === 0) return null;
 
   return (
-    <section className="overflow-hidden rounded-xl border bg-card card-elevated" aria-labelledby="period-balances">
+    <section className="overflow-hidden rounded-xl border bg-card" aria-labelledby="period-balances">
       <header className="border-b px-4 py-2.5">
         <h3 id="period-balances" className="text-sm font-medium">
           Balances by period

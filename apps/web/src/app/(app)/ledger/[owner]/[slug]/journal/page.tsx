@@ -72,7 +72,7 @@ export default function JournalPage() {
           </Button>
         }
       />
-      <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 card-elevated">
+      <div className="flex flex-col gap-3 rounded-xl border bg-card p-3">
         <div className="flex flex-wrap items-center gap-2">
           <InputGroup className="w-full max-w-sm">
             <InputGroupAddon>

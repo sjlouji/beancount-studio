@@ -51,7 +51,7 @@ export default function AccountsPage() {
         actions={openAccountButton}
       />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3 card-elevated animate-rise [animation-delay:80ms]">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3 animate-rise [animation-delay:80ms]">
         <InputGroup className="w-full max-w-sm">
           <InputGroupAddon>
             <SearchIcon />

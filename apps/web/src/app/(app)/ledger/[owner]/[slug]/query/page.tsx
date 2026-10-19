@@ -48,7 +48,7 @@ export default function QueryPage() {
         description="Run Beancount Query Language against the entries in scope. Results respect the time, account and filter settings in the header."
       />
 
-      <section className="space-y-3 rounded-xl border bg-card p-3 card-elevated animate-rise [animation-delay:80ms]">
+      <section className="space-y-3 rounded-xl border bg-card p-3 animate-rise [animation-delay:80ms]">
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}

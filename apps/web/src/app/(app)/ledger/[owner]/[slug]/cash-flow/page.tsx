@@ -108,7 +108,7 @@ export default function CashFlowPage() {
         </CardContent>
       </Card>
 
-      <section className="animate-rise overflow-hidden rounded-xl border bg-card card-elevated [animation-delay:120ms]" aria-labelledby="cf-intervals">
+      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:120ms]" aria-labelledby="cf-intervals">
         <header className="border-b px-4 py-2.5">
           <h3 id="cf-intervals" className="text-sm font-medium">
             By period
@@ -160,7 +160,7 @@ export default function CashFlowPage() {
       </section>
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
-        <section className="animate-rise overflow-hidden rounded-xl border bg-card card-elevated [animation-delay:160ms] lg:col-span-2" aria-labelledby="cf-accounts">
+        <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:160ms] lg:col-span-2" aria-labelledby="cf-accounts">
           <header className="border-b px-4 py-2.5">
             <h3 id="cf-accounts" className="text-sm font-medium">
               How each account was classified

@@ -64,7 +64,7 @@ export default function DocumentsPage() {
           }
         />
       ) : (
-        <div className="animate-rise overflow-hidden rounded-xl border bg-card card-elevated [animation-delay:80ms]">
+        <div className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:80ms]">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">

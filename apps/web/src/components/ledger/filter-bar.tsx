@@ -45,7 +45,7 @@ function TimeInput() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant={params.time ? "secondary" : "outline"} size="sm" className="gap-1.5 font-normal">
+        <Button variant={params.time ? "secondary" : "chip"} size="sm" className="gap-1.5 font-medium">
           <CalendarRangeIcon className="size-3.5 opacity-70" />
           {params.time || "All time"}
         </Button>
@@ -102,7 +102,7 @@ function AdvancedFilter() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant={params.filter ? "secondary" : "outline"} size="sm" className="gap-1.5 font-normal">
+        <Button variant={params.filter ? "secondary" : "chip"} size="sm" className="gap-1.5 font-medium">
           <FilterIcon className="size-3.5 opacity-70" />
           {params.filter ? <span className="max-w-40 truncate font-mono text-xs">{params.filter}</span> : "Filter"}
         </Button>
@@ -157,7 +157,7 @@ export function FilterBar({ className, showInterval = true, showConversion = tru
       <div className="ml-auto flex items-center gap-2">
         {showInterval && (
           <Select value={params.interval ?? "month"} onValueChange={(v) => setParams({ interval: v === "month" ? undefined : v })}>
-            <SelectTrigger size="sm" className="w-28" aria-label="Interval">
+            <SelectTrigger size="sm" className="h-8 w-28 rounded-full font-medium" aria-label="Interval">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -171,7 +171,7 @@ export function FilterBar({ className, showInterval = true, showConversion = tru
         )}
         {showConversion && (
           <Select value={conversion} onValueChange={(v) => setParams({ conversion: v === operating[0] ? undefined : v })}>
-            <SelectTrigger size="sm" className="w-36" aria-label="Conversion">
+            <SelectTrigger size="sm" className="h-8 w-36 rounded-full font-medium" aria-label="Conversion">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

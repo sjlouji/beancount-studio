@@ -136,7 +136,7 @@ export default function ReceiptPage() {
     return (
       <div className="space-y-6">
         {header}
-        <section className="space-y-4 rounded-xl border bg-card p-6 card-elevated animate-rise">
+        <section className="space-y-4 rounded-xl border bg-card p-6 animate-rise">
           <div className="flex items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-positive/10 text-positive">
               <CheckCircle2Icon className="size-5" />
@@ -213,7 +213,7 @@ export default function ReceiptPage() {
         <div className="grid items-start gap-5 lg:grid-cols-2">
           <div className="space-y-3 animate-rise [animation-delay:60ms]">
             {upload ? (
-              <div className="overflow-hidden rounded-xl border bg-card card-elevated">
+              <div className="overflow-hidden rounded-xl border bg-card">
                 <div className="flex items-center justify-between gap-2 border-b px-4 py-2">
                   <span className="truncate text-sm font-medium">{upload.filename}</span>
                   <Button variant="ghost" size="icon-sm" aria-label="Remove file" onClick={() => { setUpload(null); setReceipt(null); parse.reset(); }}>

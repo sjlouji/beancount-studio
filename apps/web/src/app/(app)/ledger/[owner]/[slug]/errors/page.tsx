@@ -46,7 +46,7 @@ export default function ErrorsPage() {
       ) : (
         <ul className="space-y-2">
           {list.map((error, index) => (
-            <li key={`${error.filename}:${error.lineno}:${index}`} className="animate-rise rounded-xl border border-negative/30 bg-card p-4 card-elevated" style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}>
+            <li key={`${error.filename}:${error.lineno}:${index}`} className="animate-rise rounded-xl border border-negative/30 bg-card p-4" style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="destructive">{error.type}</Badge>
                 {error.filename && (

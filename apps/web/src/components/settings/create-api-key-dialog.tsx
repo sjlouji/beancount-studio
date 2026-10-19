@@ -52,7 +52,7 @@ function KeyForm({ onCreated, onCancel }: { onCreated: (key: MintedApiKey) => vo
   return (
     <form onSubmit={(e) => void onSubmit(e)}>
       <DialogHeader>
-        <DialogTitle className="font-heading text-2xl">Create API key</DialogTitle>
+        <DialogTitle className="type-heading-lg">Create API key</DialogTitle>
         <DialogDescription>Keys act on your behalf over the REST API. Give each integration its own key so you can revoke it independently.</DialogDescription>
       </DialogHeader>
       <FieldGroup className="my-6">
@@ -131,7 +131,7 @@ function KeyReveal({ minted, onDone }: { minted: MintedApiKey; onDone: () => voi
   return (
     <div>
       <DialogHeader>
-        <DialogTitle className="font-heading text-2xl">Copy your key now</DialogTitle>
+        <DialogTitle className="type-heading-lg">Copy your key now</DialogTitle>
         <DialogDescription>
           <span className="font-medium text-foreground">{minted.name}</span> was created.
         </DialogDescription>

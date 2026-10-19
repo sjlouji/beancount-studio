@@ -32,16 +32,16 @@ function sumIntervals(items: IntervalTotal[], unit: string | undefined): number 
 }
 
 function StatTile({ label, value, unit, hint, tone, delay = 0 }: { label: string; value: number; unit: string | undefined; hint?: string; tone?: "positive" | "negative" | "neutral"; delay?: number }) {
-  const color = tone === "positive" ? "text-positive" : tone === "negative" ? "text-negative" : "";
+  const hintColor = tone === "positive" ? "text-positive" : tone === "negative" ? "text-negative" : "text-muted-foreground";
   return (
     <Card className="animate-rise" style={{ animationDelay: `${delay}ms` }}>
       <CardContent className="py-1">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className={cn("mt-1 font-sans text-3xl font-semibold tracking-tight", color)}>
-          {unit ? formatCompact(value, 1) : "–"}
-          {unit && <span className="ml-1.5 text-sm font-normal text-muted-foreground">{unit}</span>}
+        <div className="type-micro-cap text-muted-foreground">{label}</div>
+        <div className="mt-2 flex items-baseline gap-1.5 text-primary">
+          <span className="type-display-md tabular">{unit ? formatCompact(value, 1) : "–"}</span>
+          {unit && <span className="text-sm font-semibold text-muted-foreground">{unit}</span>}
         </div>
-        {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
+        {hint && <div className={cn("mt-1 text-xs font-medium", hintColor)}>{hint}</div>}
       </CardContent>
     </Card>
   );
@@ -121,8 +121,8 @@ export default function OverviewPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Net worth" value={latest(data.netWorthAtValue, unit)} unit={unit} hint={`at market value · ${data.netWorth.length ? formatDate(data.netWorth[data.netWorth.length - 1]!.date) : ""}`} />
-        <StatTile label="Income" value={income} unit={unit} hint={periodLabel} tone="positive" delay={40} />
-        <StatTile label="Expenses" value={expenses} unit={unit} hint={lastInterval ? `${formatCompact(lastInterval.balance[unit ?? ""] ?? 0)} ${unit} in the latest ${interval}` : undefined} tone="negative" delay={80} />
+        <StatTile label="Income" value={income} unit={unit} hint={periodLabel} delay={40} />
+        <StatTile label="Expenses" value={expenses} unit={unit} hint={lastInterval ? `${formatCompact(lastInterval.balance[unit ?? ""] ?? 0)} ${unit} in the latest ${interval}` : undefined} delay={80} />
         <StatTile label="Saved" value={net} unit={unit} hint={income > 0 ? `${savingsRate.toFixed(0)}% savings rate` : "No income in scope"} tone={net >= 0 ? "positive" : "negative"} delay={120} />
       </div>
 

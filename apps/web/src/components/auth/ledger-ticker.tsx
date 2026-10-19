@@ -35,7 +35,7 @@ function Block({ lines, i }: { lines: string[]; i: number }) {
 export function LedgerTicker() {
   const doubled = [...LINES, ...LINES];
   return (
-    <div className="pointer-events-none relative mt-10 flex-1 overflow-hidden px-10 [mask-image:linear-gradient(to_bottom,transparent,black_12%,black_80%,transparent)]">
+    <div className="pointer-events-none relative flex-1 overflow-hidden px-6 pt-5 [mask-image:linear-gradient(to_bottom,transparent,black_12%,black_80%,transparent)]">
       <div className="animate-ticker motion-reduce:animate-none">
         {doubled.map((lines, i) => (
           <Block key={i} lines={lines} i={i} />
