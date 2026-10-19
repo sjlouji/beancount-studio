@@ -15,9 +15,8 @@ bean-check, bank-statement import with de-duplication, receipt capture, collabor
 AI assistant built on [assistant-ui](https://www.assistant-ui.com) whose edits are previewed as
 diffs and committed only after you approve them.
 
-It is a from-scratch reimplementation of the web client of [beancount.io](https://github.com/bex-co/beancount-io)
-with a different stack and no hosted dependencies: **Next.js 16 + shadcn/ui** in front of a
-**Python (FastAPI) API** that runs Beancount and Fava's reporting core in-process.
+The stack is **Next.js 16 + shadcn/ui** in front of a **Python (FastAPI) API** that runs
+Beancount and Fava's reporting core in-process, with no hosted dependencies.
 
 ## What you get
 
@@ -199,11 +198,11 @@ curl -H "Authorization: Bearer bsk_…" "https://studio.example.com/api/ledgers/
 curl -H "Authorization: Bearer bsk_…" "https://studio.example.com/api/ledgers/ada/personal/reports/balance-sheet?time=2026&conversion=USD"
 ```
 
-## Not included (compared with beancount.io)
+## Out of scope today
 
-Plaid bank connections, Stripe billing, the mobile apps, git-over-SSH / public keys, the MCP
-server, the CLI, localisation (the UI is English only), and the Cloudflare sandbox agent. These
-depend on hosted services or are outside a self-hosted web app.
+Bank connections through aggregators, hosted billing, mobile apps, git over SSH with public
+keys, an MCP server, a CLI, and localisation (the UI is English only). These depend on hosted
+services or sit outside a self-hosted web app.
 
 ## License
 
