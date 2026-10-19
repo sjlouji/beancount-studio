@@ -6,7 +6,7 @@ Thanks for helping. This page is the short version; the architecture lives in
 
 ## Set up
 
-Follow [docs/install.md](docs/install.md). For day-to-day work:
+Follow [docs/development.md](docs/development.md); the production stacks are in [docs/production.md](docs/production.md). For day-to-day work:
 
 ```bash
 ./studio.sh dev                 # API with hot reload, web dev server, PostgreSQL
