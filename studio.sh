@@ -69,6 +69,14 @@ ensure_env() {
   ensure_secret POSTGRES_PASSWORD
 }
 
+# prod needs a real public host name; the template ships a placeholder that Let's Encrypt refuses.
+require_domain() {
+  case "$domain" in
+    ""|localhost|example.*|*.example.com|*.example.org|*.example.net|*.example)
+      die "DOMAIN in deploy/.env is '${domain:-unset}'. Set it to this machine's public host name, or use './studio.sh local' on a machine without one." ;;
+  esac
+}
+
 # Exports Caddy's local root certificate from its volume and trusts it system-wide.
 trust_local_ca() {
   local cert
@@ -107,9 +115,7 @@ case "$mode" in
   dev)   url="http://localhost:3000" ;;
   local) ensure_env; url="https://localhost:${BS_LOCAL_PORT:-$(env_value BS_LOCAL_PORT)}"
          [[ $url == https://localhost: ]] && url="https://localhost:8443" ;;
-  prod)  ensure_env; domain="$(env_value DOMAIN)"
-         [[ -n $domain ]] || die "set DOMAIN=your.host.name in deploy/.env, or use './studio.sh local' for a trial without TLS"
-         url="https://$domain" ;;
+  prod)  ensure_env; domain="$(env_value DOMAIN)"; url="https://$domain" ;;
 esac
 
 if [[ $mode == local && ${1:-} == trust ]]; then
@@ -138,9 +144,14 @@ case "$mode" in
     compose logs -f || true
     ;;
   local|prod)
+    hint=""
+    if [[ $mode == prod ]]; then
+      require_domain
+      hint=" (does $domain resolve to this machine, and are ports 80 and 443 reachable?)"
+    fi
     compose up --build -d
     wait_for "$url/api/healthz" 180 \
-      || die "containers are up but $url/api/healthz is not answering; run './studio.sh $mode logs'"
+      || die "containers are up but $url/api/healthz is not answering$hint; run './studio.sh $mode logs'"
     say "ready at $url (the first account created becomes the administrator)"
     if [[ $mode == local ]]; then
       if curl -fs -o /dev/null "$url/api/healthz"; then
