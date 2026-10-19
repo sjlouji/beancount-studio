@@ -1,15 +1,17 @@
-# Beancount Studio — single-host deployment.
+# Beancount Studio — production stack (single host, Caddy with automatic TLS).
 #
-#   cp .env.example .env   # set BS_SECRET_KEY, DOMAIN, and optionally an AI provider
-#   docker compose up -d --build
+#   ./studio.sh prod                      # from the repo root; creates deploy/.env on first run
+#   ./studio.sh local                     # same images without TLS (adds docker-compose.local.yml)
+#   or: docker compose -f docker-compose.prod.yml up -d --build
 #
-# Open-source models: `docker compose --profile ollama up -d --build` adds an Ollama server on
+# Open-source models: `./studio.sh prod --profile ollama up -d --build` adds an Ollama server on
 # the internal network. In .env set BS_OPENAI_BASE_URL=http://ollama:11434/v1 and
-# BS_AI_MODEL=<model>, then pull it once: `docker compose exec ollama ollama pull <model>`.
+# BS_AI_MODEL=<model>, then pull it once: `./studio.sh prod exec ollama ollama pull <model>`.
 #
 # Caddy terminates TLS for $DOMAIN (automatic certificates) and routes /api/* to the API
-# and everything else to the web app. Ledger repositories, uploads and the SQLite database
-# live in the `studio-data` volume.
+# and everything else to the web app. Ledger repositories and uploads live in the `studio-data`
+# volume; metadata lives in PostgreSQL (`postgres-data` volume). The API runs its database
+# migrations at startup.
 
 name: beancount-studio
 
@@ -33,13 +35,34 @@ services:
     env_file: .env
     environment:
       BS_DATA_DIR: /data
+      BS_DATABASE_URL: postgresql+asyncpg://studio:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/studio
       BS_PUBLIC_URL: ${BS_PUBLIC_URL:-https://${DOMAIN:-localhost}}
       BS_CORS_ORIGINS: ${BS_PUBLIC_URL:-https://${DOMAIN:-localhost}}
       BS_COOKIE_SECURE: ${BS_COOKIE_SECURE:-true}
     volumes:
       - studio-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     expose:
       - "8000"
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: studio
+      POSTGRES_DB: studio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studio -d studio"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    expose:
+      - "5432"
 
   ollama:
     image: ollama/ollama:latest
@@ -76,6 +99,7 @@ services:
 
 volumes:
   studio-data:
+  postgres-data:
   caddy-data:
   caddy-config:
   ollama-models:

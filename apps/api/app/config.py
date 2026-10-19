@@ -76,14 +76,6 @@ class Settings(BaseSettings):
         return value.expanduser().resolve()
 
     @property
-    def ledgers_dir(self) -> Path:
-        return self.data_dir / "ledgers"
-
-    @property
-    def uploads_dir(self) -> Path:
-        return self.data_dir / "uploads"
-
-    @property
     def resolved_database_url(self) -> str:
         if self.database_url:
             return self.database_url
@@ -124,8 +116,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    settings = Settings()
-    settings.data_dir.mkdir(parents=True, exist_ok=True)
-    settings.ledgers_dir.mkdir(parents=True, exist_ok=True)
-    settings.uploads_dir.mkdir(parents=True, exist_ok=True)
-    return settings
+    return Settings()

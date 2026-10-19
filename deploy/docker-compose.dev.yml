@@ -1,0 +1,81 @@
+# Beancount Studio — development stack with hot reload.
+#
+#   ./studio.sh dev                       # from the repo root → http://localhost:3000
+#   or: docker compose -f docker-compose.dev.yml up --build
+#
+# Source directories are bind-mounted: the API restarts on Python changes (uvicorn --reload)
+# and the web app runs Next's dev server. Ledgers and uploads are the host directory
+# apps/api/data; metadata is in the PostgreSQL container (an API started natively with uv uses
+# SQLite instead). deploy/.env is optional here and is read for AI provider settings and
+# POSTGRES_PASSWORD; the URL and cookie settings below always win so a production .env cannot
+# break the dev stack.
+
+name: beancount-studio-dev
+
+services:
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    # pnpm comes from corepack (package.json pins the version). node_modules and .next live in
+    # named volumes so the Linux container never shares them with the host's macOS copies. The
+    # pnpm store sits inside the node_modules volume: same filesystem (hard links work) and
+    # nothing is written to the host checkout.
+    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm dev"
+    environment:
+      API_URL: http://api:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+      npm_config_store_dir: /app/node_modules/.pnpm-store
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../apps/web:/app
+      - web-node-modules:/app/node_modules
+      - web-next:/app/.next
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ../apps/api
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      BS_DATA_DIR: /data
+      BS_DATABASE_URL: postgresql+asyncpg://studio:${POSTGRES_PASSWORD:-studio}@postgres:5432/studio
+      BS_PUBLIC_URL: http://localhost:3000
+      BS_CORS_ORIGINS: http://localhost:3000
+      BS_COOKIE_SECURE: "false"
+      # The ledger repositories on the bind mount are owned by the host user, not the image's
+      # `studio` user; without this git refuses them as "dubious ownership".
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: "*"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../apps/api/app:/app/app
+      - ../apps/api/data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: studio
+      POSTGRES_DB: studio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studio}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studio -d studio"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  web-node-modules:
+  web-next:
+  postgres-data:

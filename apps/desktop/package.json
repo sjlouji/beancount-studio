@@ -1,0 +1,32 @@
+{
+  "name": "beancount-studio-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Beancount Studio desktop shell: loads a Beancount Studio server in a hardened Electron window.",
+  "author": "Beancount Studio contributors",
+  "license": "MIT",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm build && node --test \"dist/**/*.test.js\"",
+    "dev": "pnpm build && STUDIO_SERVER_URL=http://localhost:3000 electron .",
+    "start": "pnpm build && electron .",
+    "package": "pnpm build && electron-builder --mac"
+  },
+  "devDependencies": {
+    "@beancount-studio/desktop-bridge": "link:../../packages/desktop-bridge",
+    "@types/node": "^22.20.5",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^7.0.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ]
+  },
+  "dependencies": {
+    "electron-log": "^5.4.4"
+  }
+}

@@ -1,0 +1,21 @@
+# Packaging for the desktop shell. `pnpm package` builds signed dmg + zip for Apple silicon and
+# Intel. Signing uses the Developer ID certificate in the keychain (or CSC_LINK/CSC_KEY_PASSWORD);
+# notarization runs when APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID are set.
+appId: io.beancount.studio.desktop
+productName: Beancount Studio
+directories:
+  output: release
+files:
+  - dist/**/*
+  - "!dist/**/*.test.js"
+  - "!dist/**/*.test.js.map"
+  - static/**/*
+mac:
+  category: public.app-category.finance
+  hardenedRuntime: true
+  notarize: true
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]

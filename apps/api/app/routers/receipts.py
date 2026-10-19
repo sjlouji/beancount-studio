@@ -37,7 +37,7 @@ async def parse(
         raise FeatureDisabledError(
             f"Receipt scanning needs the AI assistant. {AI_DISABLED_MESSAGE}"
         )
-    upload, data = await load_upload(db, settings, user, body.upload_id)
+    upload, data = await load_upload(db, user, body.upload_id)
     ledger = access.ledger
     attrs = await get_store().run(ledger.id, engine.attributes, ledger.main_file)
     parsed = await parse_receipt(
@@ -76,9 +76,7 @@ def _slug(value: str) -> str:
 
 
 @router.post("/insert", status_code=201)
-async def insert(
-    body: InsertRequest, access: LedgerWriteDep, user: UserDep, db: DbDep, settings: SettingsDep
-):
+async def insert(body: InsertRequest, access: LedgerWriteDep, user: UserDep, db: DbDep):
     store = get_store()
     ledger = access.ledger
     try:
@@ -91,7 +89,7 @@ async def insert(
     receipt_rel: str | None = None
     upload_bytes: bytes | None = None
     if body.upload_id and body.attach_file:
-        upload, upload_bytes = await load_upload(db, settings, user, body.upload_id)
+        upload, upload_bytes = await load_upload(db, user, body.upload_id)
         ext = Path(upload.filename).suffix.lower() or ".bin"
         receipt_rel = (
             f"receipts/{body.date}-{_slug(body.payee or body.narration)}-{upload.id[:6]}{ext}"

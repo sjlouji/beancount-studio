@@ -1,0 +1,13 @@
+{
+  "name": "@beancount-studio/desktop-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Typed contract between the Beancount Studio web client and the desktop shell's preload script.",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts"
+    }
+  },
+  "files": ["src"]
+}

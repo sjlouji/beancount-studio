@@ -21,10 +21,10 @@ from typing import Any, TypeVar
 from beancount import loader as beancount_loader
 from fava.core import FavaLedger
 
-from app.config import Settings, get_settings
 from app.errors import LedgerError, NotFoundError, ValidationError
 from app.ledgers.git import Author, GitRepo
 from app.logging_setup import get_logger
+from app.storage import LedgerPaths, Storage, get_storage
 
 log = get_logger(__name__)
 T = TypeVar("T")
@@ -45,13 +45,6 @@ _TEXT_EXTENSIONS = {
     ".ofx",
     ".qif",
 }
-
-
-@dataclass(frozen=True)
-class LedgerPaths:
-    root: Path
-    repo: Path
-    main_file: Path
 
 
 @dataclass(frozen=True)
@@ -120,16 +113,14 @@ class _LedgerHandle:
 
 
 class LedgerStore:
-    def __init__(self, settings: Settings | None = None) -> None:
-        self.settings = settings or get_settings()
+    def __init__(self, storage: Storage | None = None) -> None:
+        self.storage = storage or get_storage()
         self._handles: dict[str, _LedgerHandle] = {}
         self._handles_lock = threading.Lock()
 
     # ------------------------------------------------------------------ paths
     def paths(self, ledger_id: str, main_file: str = "main.bean") -> LedgerPaths:
-        root = self.settings.ledgers_dir / ledger_id
-        repo = root / "repo"
-        return LedgerPaths(root=root, repo=repo, main_file=repo / main_file)
+        return self.storage.ledger_paths(ledger_id, main_file)
 
     def repo(self, ledger_id: str) -> GitRepo:
         return GitRepo(self.paths(ledger_id).repo)

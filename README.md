@@ -3,6 +3,10 @@
 </p>
 <h1 align="center">Beancount Studio</h1>
 <p align="center"><strong>Self-hosted, plain-text accounting with real reports, a ledger editor, imports, receipts, and an assistant that asks before it writes.</strong></p>
+<p align="center">
+  <a href="https://github.com/sjlouji/beancount-studio/actions/workflows/ci.yml"><img src="https://github.com/sjlouji/beancount-studio/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+</p>
 
 Beancount Studio is a web workspace for [Beancount](https://beancount.github.io/docs/) ledgers.
 Your books stay readable text files in a git repository you own; the app adds the interface:
@@ -33,28 +37,52 @@ categorisation work with either an Anthropic API key or an open-source model ser
 Ollama, vLLM, LM Studio, llama.cpp or any other OpenAI-compatible server (see
 [Open-source models](#open-source-models)); set SMTP to enable password-reset email.
 
-## Quick start (Docker)
+## Quick start
+
+Full installation steps for the server and the Mac app are in [docs/install.md](docs/install.md).
+
+One script drives every Docker stack. It checks that Docker is running, creates `deploy/.env`
+with a generated `BS_SECRET_KEY` when needed, builds and starts the containers, waits for the
+health check and opens the browser.
 
 ```bash
-git clone <this repo> beancount-studio && cd beancount-studio/deploy
-cp .env.example .env            # set BS_SECRET_KEY (openssl rand -hex 32) and DOMAIN
-docker compose up -d --build    # Caddy serves https://$DOMAIN with automatic certificates
+git clone https://github.com/sjlouji/beancount-studio.git beancount-studio && cd beancount-studio
+./studio.sh dev      # hot-reload development stack → http://localhost:3000
+./studio.sh local    # production images on this machine → https://localhost:8443
+./studio.sh prod     # production stack; Caddy serves https://$DOMAIN with automatic certificates
 ```
 
-For a local trial without TLS:
+| Mode | Compose files in `deploy/` | What runs |
+| --- | --- | --- |
+| `dev` | `docker-compose.dev.yml` | Source bind-mounted, uvicorn `--reload` and `next dev`, PostgreSQL; ledgers in `apps/api/data` |
+| `local` | `docker-compose.prod.yml` + `docker-compose.local.yml` | Production images, PostgreSQL, Caddy over HTTPS from its own local certificate authority (`BS_LOCAL_PORT`, default 8443) |
+| `prod` | `docker-compose.prod.yml` | Production images, PostgreSQL, Caddy with public TLS for `DOMAIN` |
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
-open http://localhost:8080          # set BS_LOCAL_PORT in .env if 8080 is taken
-```
+Anything after the mode is passed to `docker compose` for that stack: `./studio.sh dev down`,
+`./studio.sh prod logs -f`, `./studio.sh local ps`.
+
+`local` is production on your laptop. Run `./studio.sh local trust` once per machine to add
+Caddy's local root certificate to the system keychain; browsers and the desktop app then open
+`https://localhost:8443` without warnings. For `prod`, set `DOMAIN` in `deploy/.env` first; the
+script refuses to start without it.
 
 Create the first account in the browser; it becomes the administrator. Set
-`BS_ALLOW_SIGNUP=false` afterwards if the instance should stay private. Ledgers, uploads and
-the database live in the `studio-data` volume (`/data` in the API container); back that up.
+`BS_ALLOW_SIGNUP=false` afterwards if the instance should stay private. In `local` and `prod`,
+ledgers and uploads live in the `studio-data` volume (`/data` in the API container) and metadata
+in PostgreSQL (`postgres-data`); back up both. The API migrates the database schema at startup.
 
 ## Development
 
-Requirements: Node 22 + pnpm, Python 3.12 + [uv](https://docs.astral.sh/uv/), git.
+`./studio.sh dev` is the usual way to work: the API restarts on Python changes and the web app
+runs Next's dev server, both inside Docker with the source bind-mounted and PostgreSQL alongside.
+`deploy/.env` is optional in this mode and is read for AI provider settings.
+
+Schema changes are Alembic revisions under `apps/api/app/db/migrations`, applied by the API at
+startup. After editing the models: `cd apps/api && uv run alembic revision --autogenerate
+--rev-id 0002 -m "describe the change"`, then review the generated file.
+
+To run the servers on the host instead you need Node 22 + pnpm, Python 3.12 +
+[uv](https://docs.astral.sh/uv/) and git:
 
 ```bash
 # API (http://localhost:8000, docs at /api/docs)
@@ -72,13 +100,35 @@ pnpm dev
 Checks: `cd apps/api && uv run ruff check app tests && uv run pytest` and
 `cd apps/web && pnpm exec tsc --noEmit && pnpm lint && pnpm build`.
 
+## Desktop app (macOS)
+
+`apps/desktop` is an Electron shell that loads a Beancount Studio server in a hardened window,
+the way Slack's desktop app loads its web client ([ADR 0001](docs/adr/0001-desktop-app-is-an-electron-shell.md)).
+On first launch it asks for a server address, checks it and remembers it; you sign in on the
+server's own pages.
+
+```bash
+./studio.sh dev                       # a server to connect to, http://localhost:3000
+cd apps/desktop && pnpm install
+pnpm dev                              # opens the shell pointed at the dev server
+pnpm start                            # first-launch flow: asks for a server address
+pnpm test                             # tsc + node:test
+pnpm package                          # signed dmg + zip in apps/desktop/release (needs a Developer ID)
+```
+
+Set `STUDIO_SERVER_URL` to override the saved server for one run. The shell exposes
+`window.studioDesktop` (typed by `packages/desktop-bridge`) so the web client can tell it runs
+inside the app.
+
 ## Architecture
 
 ```
 apps/web   Next.js 16 (App Router) · React 19 · Tailwind v4 · shadcn/ui · TanStack Query · Recharts · Monaco · assistant-ui
-apps/api   FastAPI · SQLAlchemy (SQLite by default, PostgreSQL optional) · beancount 3 + beanquery + fava core · git · anthropic + openai SDKs
-deploy     docker-compose (web + api + Caddy, optional Ollama profile), Caddyfile, env template
-docs       conventions and design notes
+apps/api   FastAPI · SQLAlchemy + Alembic (PostgreSQL in Docker, SQLite natively) · beancount 3 + beanquery + fava core · git · anthropic + openai SDKs
+apps/desktop  Electron shell for macOS · loads a server's web UI · typed bridge from packages/desktop-bridge
+packages   desktop-bridge (contract between the web client and the shell)
+deploy     docker-compose.dev.yml (hot reload) · docker-compose.prod.yml + .local.yml (web + api + Caddy, optional Ollama profile) · Caddyfile · env template
+docs       conventions, design notes and ADRs (docs/adr)
 ```
 
 - **Ledgers are git repositories** under `BS_DATA_DIR/ledgers/<id>/repo`. Every write (editor
@@ -101,8 +151,8 @@ API settings are environment variables prefixed with `BS_` (see `apps/api/.env.e
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `BS_DATA_DIR` | `./data` | Ledgers, uploads, SQLite database |
-| `BS_DATABASE_URL` | SQLite in data dir | e.g. `postgresql+asyncpg://user:pass@host/db` |
+| `BS_DATA_DIR` | `./data` | Ledgers and uploads (and the SQLite database when used) |
+| `BS_DATABASE_URL` | SQLite in data dir | The Docker stacks set `postgresql+asyncpg://…@postgres/studio`; native runs and tests use SQLite |
 | `BS_SECRET_KEY` | change-me | Signs password-reset tokens |
 | `BS_PUBLIC_URL` / `BS_CORS_ORIGINS` | `http://localhost:3000` | Public URL (emails) and allowed origins |
 | `BS_ALLOW_SIGNUP` | `true` | Allow new accounts after the first one |
@@ -126,11 +176,10 @@ receipts. Small models can run the loop but are less reliable at building valid 
 **Bundled Ollama (Docker):**
 
 ```bash
-cd deploy
-docker compose --profile ollama up -d --build
-docker compose exec ollama ollama pull qwen3:14b
-# in .env:  BS_OPENAI_BASE_URL=http://ollama:11434/v1   BS_AI_MODEL=qwen3:14b
-docker compose up -d api
+./studio.sh prod --profile ollama up -d --build
+./studio.sh prod exec ollama ollama pull qwen3:14b
+# in deploy/.env:  BS_OPENAI_BASE_URL=http://ollama:11434/v1   BS_AI_MODEL=qwen3:14b
+./studio.sh prod up -d api
 ```
 
 **Any other OpenAI-compatible server** (local vLLM / LM Studio / llama.cpp, or hosted

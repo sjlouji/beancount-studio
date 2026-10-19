@@ -29,3 +29,7 @@ apps/web/next-env.d.ts
 
 # Monaco assets are copied from node_modules on dev/build
 apps/web/public/monaco
+
+# Desktop shell
+apps/desktop/dist
+apps/desktop/release
