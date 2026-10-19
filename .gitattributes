@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+# Lockfiles are generated; keep diffs quiet and never merge them by hand.
+pnpm-lock.yaml -diff merge=binary linguist-generated
+uv.lock -diff merge=binary linguist-generated
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.icns binary
+*.dmg binary
+*.pdf binary

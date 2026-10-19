@@ -1,0 +1,43 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ./studio.sh local
+        2. Open ...
+        3. Click ...
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Web app in a browser
+        - Mac app
+        - API / assistant
+        - Deploy stack (studio.sh, Docker)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: desktop-v0.1.0, or a commit hash
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "`./studio.sh <mode> logs` or ~/Library/Logs/beancount-studio-desktop/main.log. Remove anything private."
+      render: text
