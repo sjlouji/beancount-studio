@@ -97,7 +97,7 @@ export function GeneralCard({ ledger }: { ledger: Ledger }) {
 
 const VISIBILITY_OPTIONS = [
   { value: "private", icon: LockIcon, title: "Private", description: "Only you and the collaborators you add can open this ledger." },
-  { value: "public", icon: GlobeIcon, title: "Public", description: "Anyone can read this ledger and it appears in the gallery. Only people with write access can change it." },
+  { value: "public", icon: GlobeIcon, title: "Public", description: "Anyone with the link can read this ledger. Only people with write access can change it." },
 ] as const;
 
 export function VisibilityCard({ ledger }: { ledger: Ledger }) {

@@ -192,7 +192,7 @@ function NewEntryForm({ open, onOpenChange, initialKind = "Transaction", initial
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="type-heading-lg">New entry</DialogTitle>
+          <DialogTitle className="type-title-2">New entry</DialogTitle>
           <DialogDescription>Written to the ledger&apos;s default file and committed immediately.</DialogDescription>
         </DialogHeader>
         <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)}>

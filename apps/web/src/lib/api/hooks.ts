@@ -19,18 +19,22 @@ import type {
   Entry,
   EntryContext,
   FileContent,
+  GitTestResult,
   IncomeStatementReport,
   JournalResponse,
   Ledger,
   LedgerAttributes,
   LedgerError,
   LedgerMeta,
+  LedgerRemote,
   MintedApiKey,
   OptionsReport,
   OverviewReport,
   PublicProfile,
   QueryResult,
+  RemoteConnectInput,
   ReportParams,
+  SshKey,
   StatisticsReport,
   SystemInfo,
   TreeEntry,
@@ -40,9 +44,9 @@ import type {
 
 export const keys = {
   me: ["me"] as const,
+  sshKey: ["ssh-key"] as const,
   system: ["system"] as const,
   ledgers: ["ledgers"] as const,
-  gallery: (q?: string) => ["gallery", q ?? ""] as const,
   activity: ["activity"] as const,
   apiKeys: ["api-keys"] as const,
   profile: (username: string) => ["profile", username] as const,
@@ -111,9 +115,6 @@ export function useLedgers(enabled = true) {
   return useQuery<Ledger[]>({ queryKey: keys.ledgers, queryFn: () => apiGet<Ledger[]>("/ledgers"), enabled });
 }
 
-export function useGallery(q?: string) {
-  return useQuery<Ledger[]>({ queryKey: keys.gallery(q), queryFn: () => apiGet<Ledger[]>("/ledgers/gallery", { q }) });
-}
 
 export function useActivity(limit = 20) {
   return useQuery<{ items: ActivityItem[]; total: number }>({
@@ -123,7 +124,12 @@ export function useActivity(limit = 20) {
 }
 
 export function useLedger(owner: string, slug: string) {
-  return useQuery<Ledger>({ queryKey: keys.ledger(owner, slug), queryFn: () => apiGet<Ledger>(ledgerPath(owner, slug)) });
+  return useQuery<Ledger>({
+    queryKey: keys.ledger(owner, slug),
+    queryFn: () => apiGet<Ledger>(ledgerPath(owner, slug)),
+    // A push lasts seconds; poll only while one is in flight so the status chip stays honest.
+    refetchInterval: (query) => (query.state.data?.remote?.state === "pushing" ? 3000 : false),
+  });
 }
 
 export function useLedgerMeta(owner: string, slug: string) {
@@ -163,6 +169,71 @@ export function useInvalidateLedger(owner: string, slug: string) {
     void qc.invalidateQueries({ queryKey: keys.ledgers });
     void qc.invalidateQueries({ queryKey: keys.activity });
   };
+}
+
+// ---------------------------------------------------------------- ssh key
+
+export function useSshKey() {
+  return useQuery<SshKey | null>({
+    queryKey: keys.sshKey,
+    queryFn: async () => {
+      try {
+        return await apiGet<SshKey>("/users/me/ssh-key");
+      } catch (error) {
+        if (isApiError(error, 404)) return null;
+        throw error;
+      }
+    },
+  });
+}
+
+export function useCreateSshKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<SshKey>("/users/me/ssh-key"),
+    onSuccess: (key) => qc.setQueryData(keys.sshKey, key),
+  });
+}
+
+export function useDeleteSshKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiDelete<void>("/users/me/ssh-key"),
+    onSuccess: () => qc.setQueryData(keys.sshKey, null),
+  });
+}
+
+// ---------------------------------------------------------------- remotes
+
+export function useTestRepository() {
+  return useMutation({ mutationFn: (input: RemoteConnectInput) => apiPost<GitTestResult>("/git/test", input) });
+}
+
+export function useConnectRemote(owner: string, slug: string) {
+  const invalidate = useInvalidateLedger(owner, slug);
+  return useMutation({
+    mutationFn: (input: RemoteConnectInput) => apiPut<LedgerRemote>(`${ledgerPath(owner, slug)}/remote`, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDisconnectRemote(owner: string, slug: string) {
+  const invalidate = useInvalidateLedger(owner, slug);
+  return useMutation({ mutationFn: () => apiDelete<void>(`${ledgerPath(owner, slug)}/remote`), onSuccess: invalidate });
+}
+
+/** Sync and resolve can change ledger content, so everything derived from it is refetched. */
+export function useSyncRemote(owner: string, slug: string) {
+  const invalidate = useInvalidateLedger(owner, slug);
+  return useMutation({ mutationFn: () => apiPost<LedgerRemote>(`${ledgerPath(owner, slug)}/remote/sync`), onSuccess: invalidate });
+}
+
+export function useResolveRemote(owner: string, slug: string) {
+  const invalidate = useInvalidateLedger(owner, slug);
+  return useMutation({
+    mutationFn: (keep: "local" | "remote") => apiPost<LedgerRemote>(`${ledgerPath(owner, slug)}/remote/resolve`, { keep }),
+    onSuccess: invalidate,
+  });
 }
 
 // ---------------------------------------------------------------- reports

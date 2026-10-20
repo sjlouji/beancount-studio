@@ -1,7 +1,8 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { ErrorState } from "@/components/app/states";
 import { AuthCard, FormError } from "@/components/auth/auth-form";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -14,17 +15,25 @@ const DEEP_LINK = "beancount-studio://signed-in";
 /**
  * The desktop app opened this page in the default browser. The app holds a secret and sent only
  * its hash (`challenge`); approving binds that hash to the signed-in account, after which the app
- * redeems its secret for a session. Unauthenticated visitors are sent to /login by the proxy and
- * come back here with the same query.
+ * redeems its secret for a session. Visitors without a session cookie are sent to /login by the
+ * proxy and come back here with the same query; the proxy cannot tell a live cookie from a stale
+ * one, so a signed-out answer from the API is handled here the same way.
  */
 function DesktopSignIn() {
+  const router = useRouter();
   const params = useSearchParams();
   const challenge = params.get("challenge") ?? "";
   const deepLink = params.get("deeplink") === "1";
-  const { data: me, isPending } = useMe();
+  const { data: me, isPending, error, refetch } = useMe();
   const approve = useApproveDesktopSignIn();
   const [approved, setApproved] = useState(false);
   const appLink = `${DEEP_LINK}?challenge=${challenge}`;
+  const signedOut = me === null;
+  const loginHref = `/login?next=${encodeURIComponent(`/desktop/sign-in?${params.toString()}`)}`;
+
+  useEffect(() => {
+    if (signedOut) router.replace(loginHref);
+  }, [signedOut, loginHref, router]);
 
   if (!CHALLENGE.test(challenge)) {
     return (
@@ -32,6 +41,9 @@ function DesktopSignIn() {
         {null}
       </AuthCard>
     );
+  }
+  if (error) {
+    return <ErrorState error={error} title="Couldn't check who is signed in" onRetry={() => void refetch()} />;
   }
   if (isPending || !me) {
     return (
@@ -62,7 +74,7 @@ function DesktopSignIn() {
       footer="Did not ask for this? Close this page. Nothing happens without your approval."
     >
       <div className="space-y-5">
-        <p className="type-body-md text-muted-foreground">Only approve if you just started signing in from the app on this computer.</p>
+        <p className="type-body text-muted-foreground">Only approve if you just started signing in from the app on this computer.</p>
         <FormError message={approve.error ? errorMessage(approve.error) : null} />
         <Button
           size="lg"

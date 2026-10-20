@@ -1,20 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { use } from "react";
-import { ErrorState, LoadingState } from "@/components/app/states";
+import { FrameSkeleton } from "@/components/app/app-frame";
+import { Brand } from "@/components/app/brand";
+import { ErrorState } from "@/components/app/states";
 import { LedgerShell } from "@/components/ledger/ledger-shell";
 import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/api/client";
 import { useLedger } from "@/lib/api/hooks";
-import Link from "next/link";
-import { Brand } from "@/components/app/brand";
 
 export default function LedgerLayout({ children, params }: { children: React.ReactNode; params: Promise<{ owner: string; slug: string }> }) {
   const { owner, slug } = use(params);
   const query = useLedger(owner, slug);
 
   if (query.isPending) {
-    return <LoadingState label="Opening ledger…" className="min-h-dvh" />;
+    return <FrameSkeleton />;
   }
   if (query.isError) {
     const unauthorized = isApiError(query.error, 401);

@@ -1,6 +1,6 @@
 "use client";
 
-import { GitCommitHorizontalIcon, LockIcon, PlusIcon, StarIcon } from "lucide-react";
+import { GitCommitHorizontalIcon, LockIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
@@ -129,16 +129,13 @@ export default function LedgersPage() {
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,1.4fr)]">
-        <Card variant="cream" className="animate-rise [animation-delay:120ms]">
+        <Card variant="muted" className="animate-rise [animation-delay:120ms]">
           <CardContent className="space-y-3 text-sm">
-            <h2 className="type-heading-sm">Good to know</h2>
+            <h2 className="type-headline">Good to know</h2>
             <ul className="space-y-2 text-muted-foreground">
               <li>Press <kbd className="rounded border bg-background px-1 font-mono text-xs">⌘K</kbd> inside a ledger to jump anywhere.</li>
               <li>Every edit becomes a commit — open History on any ledger to see diffs and roll things back by hand.</li>
               <li>Share a ledger from its Settings page; collaborators can be readers or writers.</li>
-              <li className="flex items-center gap-1.5">
-                <StarIcon className="size-3.5" /> Star public ledgers in the Gallery to find them again.
-              </li>
             </ul>
           </CardContent>
         </Card>
