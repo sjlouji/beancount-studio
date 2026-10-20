@@ -3,16 +3,17 @@ import { IBM_Plex_Mono, Inter } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
-// DESIGN.md: Inter stands in for both proprietary tiers (display and UI); the mono face is for ledger source.
+// DESIGN.md: the platform's system face comes first; Inter and Plex Mono are the fallbacks on
+// devices without SF (globals.css builds the stacks from these variables).
 const sans = Inter({
-  variable: "--font-sans",
+  variable: "--font-inter",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
 const mono = IBM_Plex_Mono({
-  variable: "--font-mono",
+  variable: "--font-plex-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   display: "swap",

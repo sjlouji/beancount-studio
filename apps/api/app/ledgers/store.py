@@ -117,6 +117,8 @@ class LedgerStore:
         self.storage = storage or get_storage()
         self._handles: dict[str, _LedgerHandle] = {}
         self._handles_lock = threading.Lock()
+        # Called with the ledger id after every commit; the remote sync schedules its push here.
+        self.commit_listeners: list[Callable[[str], None]] = []
 
     # ------------------------------------------------------------------ paths
     def paths(self, ledger_id: str, main_file: str = "main.bean") -> LedgerPaths:
@@ -126,11 +128,16 @@ class LedgerStore:
         return GitRepo(self.paths(ledger_id).repo)
 
     def _handle(self, ledger_id: str, main_file: str = "main.bean") -> _LedgerHandle:
+        paths = self.paths(ledger_id, main_file)
         with self._handles_lock:
             handle = self._handles.get(ledger_id)
             if handle is None:
-                handle = _LedgerHandle(self.paths(ledger_id, main_file))
+                handle = _LedgerHandle(paths)
                 self._handles[ledger_id] = handle
+            elif handle.fava is None and handle.paths != paths:
+                # Created by write_lock() or reload(), which do not know the ledger's main file;
+                # the first read names it, before the engine is loaded.
+                handle.paths = paths
             return handle
 
     def evict(self, ledger_id: str) -> None:
@@ -204,7 +211,17 @@ class LedgerStore:
 
     async def commit(self, ledger_id: str, message: str, author: Author) -> str | None:
         sha = await self.repo(ledger_id).commit_all(message, author)
-        # Reload the engine so the next read sees the committed state.
+        await self.reload(ledger_id)
+        if sha is not None:
+            for listener in self.commit_listeners:
+                try:
+                    listener(ledger_id)
+                except Exception:  # a listener must never turn a saved commit into an error
+                    log.exception("commit listener failed for ledger %s", ledger_id)
+        return sha
+
+    async def reload(self, ledger_id: str) -> None:
+        """Make the cached engine pick up what is now in the working tree."""
         handle = self._handle(ledger_id)
 
         def _reload() -> None:
@@ -213,7 +230,6 @@ class LedgerStore:
                     handle.fava.changed()
 
         await asyncio.to_thread(_reload)
-        return sha
 
     # ------------------------------------------------------------- projections
     async def project(

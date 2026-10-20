@@ -36,10 +36,10 @@ function StatTile({ label, value, unit, hint, tone, delay = 0 }: { label: string
   return (
     <Card className="animate-rise" style={{ animationDelay: `${delay}ms` }}>
       <CardContent className="py-1">
-        <div className="type-micro-cap text-muted-foreground">{label}</div>
-        <div className="mt-2 flex items-baseline gap-1.5 text-primary">
-          <span className="type-display-md tabular">{unit ? formatCompact(value, 1) : "–"}</span>
-          {unit && <span className="text-sm font-semibold text-muted-foreground">{unit}</span>}
+        <div className="type-caption-2 text-muted-foreground">{label}</div>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-primary">
+          <span className="type-title-1 tabular">{unit ? formatCompact(value, 1) : "–"}</span>
+          {unit && <span className="type-footnote font-semibold whitespace-nowrap text-muted-foreground">{unit}</span>}
         </div>
         {hint && <div className={cn("mt-1 text-xs font-medium", hintColor)}>{hint}</div>}
       </CardContent>
@@ -60,7 +60,7 @@ export default function OverviewPage() {
   if (overview.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Overview" title={ctx.ledger.title} />
+        <PageHeader eyebrow={`${ctx.owner}/${ctx.slug}`} title="Overview" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <CardSkeleton key={i} rows={1} />
@@ -76,7 +76,7 @@ export default function OverviewPage() {
   if (data.transactionsCount === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Overview" title={ctx.ledger.title} description={ctx.ledger.description} />
+        <PageHeader eyebrow={`${ctx.owner}/${ctx.slug}`} title="Overview" description={ctx.ledger.description} />
         <EmptyState
           title="This ledger has no transactions yet"
           description="Add your first transaction, import a bank statement, or ask the assistant to set things up."

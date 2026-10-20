@@ -20,13 +20,18 @@ interface Leaf {
   rect: Rect;
 }
 
-/** Squarified treemap layout (Bruls et al.) over a list of weights. */
+/**
+ * Squarified treemap layout (Bruls et al.) over a list of weights. Only finite, positive weights
+ * take part: a zero or negative balance has no area, and a zero area makes the row-fit score NaN,
+ * which would otherwise leave the row empty and the loop below spinning forever.
+ */
 function squarify(items: Array<{ key: string; value: number }>, rect: Rect): Map<string, Rect> {
   const out = new Map<string, Rect>();
-  const total = items.reduce((s, i) => s + i.value, 0);
-  if (total <= 0 || items.length === 0) return out;
+  const positive = items.filter((i) => Number.isFinite(i.value) && i.value > 0);
+  const total = positive.reduce((s, i) => s + i.value, 0);
+  if (total <= 0 || positive.length === 0 || !(rect.w > 0) || !(rect.h > 0)) return out;
   let { x, y, w, h } = rect;
-  let remaining = items.map((i) => ({ ...i, area: (i.value / total) * rect.w * rect.h }));
+  let remaining = positive.map((i) => ({ ...i, area: (i.value / total) * rect.w * rect.h }));
   while (remaining.length > 0) {
     const horizontal = w >= h;
     const side = horizontal ? h : w;
@@ -43,6 +48,8 @@ function squarify(items: Array<{ key: string; value: number }>, rect: Rect): Map
         best = worst;
       } else break;
     }
+    // Every pass must place at least one item, whatever the score says.
+    if (row.length === 0) row = [remaining[0]!];
     const rowArea = row.reduce((s, i) => s + i.area, 0);
     const thickness = side > 0 ? rowArea / side : 0;
     let offset = 0;
@@ -113,8 +120,10 @@ export function HierarchyTreemap({
         if (own > 0) out.push({ key: n.account, value: own });
         return out;
       };
-      const inner = squarify(collect(child), { x: rect.x + 2, y: rect.y + 2, w: Math.max(0, rect.w - 4), h: Math.max(0, rect.h - 4) });
-      for (const [key, r] of inner) leaves.push({ account: key, value: sign * 0 + (collect(child).find((c) => c.key === key)?.value ?? 0), color, rect: r });
+      const members = collect(child);
+      const valueOf = new Map(members.map((m) => [m.key, m.value]));
+      const inner = squarify(members, { x: rect.x + 2, y: rect.y + 2, w: Math.max(0, rect.w - 4), h: Math.max(0, rect.h - 4) });
+      for (const [key, r] of inner) leaves.push({ account: key, value: valueOf.get(key) ?? 0, color, rect: r });
     });
     const own = layout.get(node.account);
     if (own) leaves.push({ account: node.account, value: ownRemainder, color: seriesColor(topLevel.length), rect: own });

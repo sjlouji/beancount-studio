@@ -20,8 +20,9 @@ from app.core.deps import (
     author_for,
     resolve_role,
 )
-from app.db.models import Ledger, LedgerCollaborator, LedgerStar, User
+from app.db.models import Ledger, LedgerCollaborator, LedgerStar, User, new_id
 from app.errors import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.ledgers.remotes import get_remote_sync, parse_source
 from app.ledgers.store import get_store
 from app.logging_setup import get_logger
 from app.schemas import (
@@ -31,6 +32,7 @@ from app.schemas import (
     LedgerCreateRequest,
     LedgerOut,
     LedgerUpdateRequest,
+    RemoteOut,
 )
 
 log = get_logger(__name__)
@@ -71,6 +73,10 @@ async def ledger_out(
         created_at=ledger.created_at,
         updated_at=ledger.updated_at,
         last_commit=last_commit,
+        # The URL may be a server path and the last error raw git output: writers only.
+        remote=RemoteOut.model_validate(ledger.remote)
+        if ledger.remote is not None and access.can_write
+        else None,
     )
 
 
@@ -175,16 +181,29 @@ async def create_ledger(body: LedgerCreateRequest, user: UserDep, db: DbDep, aut
     ).scalar_one_or_none()
     if exists is not None:
         raise ConflictError(f"You already have a ledger at /{user.username}/{slug}")
+    source = parse_source(body.source.url) if body.source is not None else None
+    # The repository is prepared before the row exists, so a clone that takes minutes never
+    # holds a database write transaction open (SQLite would block every other writer).
     ledger = Ledger(
+        id=new_id(),
         owner_id=user.id,
         slug=slug,
         title=body.title.strip(),
         description=body.description.strip(),
         visibility=body.visibility,
+        remote=None,
     )
-    db.add(ledger)
-    await db.flush()
-    try:
+    if body.source is not None and source is not None:
+        ledger.main_file = await get_remote_sync().clone(
+            db,
+            ledger,
+            user,
+            source,
+            body.source.auth,
+            body.source.token,
+            body.source.main_file,
+        )
+    else:
         await get_store().create(
             ledger.id,
             template=body.template,
@@ -192,11 +211,17 @@ async def create_ledger(body: LedgerCreateRequest, user: UserDep, db: DbDep, aut
             currency=body.currency,
             author=author_for(user),
         )
+    db.add(ledger)
+    try:
+        await db.commit()
     except Exception:
         await db.rollback()
+        await get_store().delete(ledger.id)
         raise
-    await db.commit()
-    log.info("ledger %s/%s created from template %s", user.username, slug, body.template)
+    if source is not None:
+        log.info("ledger %s/%s created from %s", user.username, slug, source.url)
+    else:
+        log.info("ledger %s/%s created from template %s", user.username, slug, body.template)
     return await ledger_out(db, ledger, LedgerAccess(ledger=ledger, role="owner", auth=auth))
 
 

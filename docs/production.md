@@ -147,6 +147,16 @@ API settings, all prefixed `BS_` and also read by native runs from `apps/api/.en
 The web container reads `API_URL`, the server-side address of the API used by the `/api`
 rewrite; the stacks set it to `http://api:8000`.
 
+## Remotes and credentials
+
+Ledgers connected to a git remote push after every commit. The API image includes
+`openssh-client` for SSH remotes; GitHub's host keys are pre-seeded in
+`<data>/ssh/known_hosts` and other hosts are pinned on first use. Tokens and the per-account SSH
+private keys are stored encrypted under `BS_SECRET_KEY`: changing that key makes them
+undecryptable, and affected remotes show an error until they are reconnected or the SSH key is
+generated again. Importing from a path on the server is limited to administrators and refuses
+paths inside the data directory.
+
 ## Data, backups and upgrades
 
 Two volumes hold everything: `studio-data` (ledgers and uploads, mounted at `/data` in the API

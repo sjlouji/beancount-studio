@@ -9,12 +9,12 @@ Next.js 16 App Router · React 19 · TypeScript · Tailwind v4 · shadcn/ui (rad
 
 ```
 src/app/(auth)/…                      login, sign-up, forgot/reset password
-src/app/(app)/(home)/…                /ledgers, /gallery, /settings/*, /u/[username]   (top-bar layout)
-src/app/(app)/ledger/[owner]/[slug]/… every ledger page                                  (sidebar shell)
-src/components/ui/*                   shadcn primitives (do not edit)
+src/app/(app)/(home)/…                /ledgers, /settings/*, /u/[username]   (AppFrame + HomeSidebar)
+src/app/(app)/ledger/[owner]/[slug]/… every ledger page                                  (AppFrame + rail sections + LedgerSidebar, header tabs, Ask panel)
+src/components/ui/*                   shadcn primitives, restyled to DESIGN.md (tokens only; keep their APIs)
 src/components/assistant-ui/*         assistant-ui registry components (do not edit)
-src/components/app/*                  app-wide pieces: PageHeader, states, Amount, theme toggle, user menu, command palette
-src/components/ledger/*               ledger pieces: context, shell, sidebar, filter bar, hierarchy table, entry cards/sheet, diff view, dialogs
+src/components/app/*                  the frame (AppFrame, Rail, TopBar, ContentHeader, MobileTabBar, HomeSidebar, sidebar-parts, home-search), PageHeader, states, Amount, theme toggle, user menu, command palette
+src/components/ledger/*               ledger pieces: context (incl. the Ask panel state), shell, sidebar, ledger-nav (one table of pages), ask-panel, filter bar, hierarchy table, entry cards/sheet, diff view, dialogs
 src/components/charts/*               Recharts wrappers + chart primitives (palette, tooltip, legend)
 src/lib/api/client.ts                 api(), apiGet/apiPost/apiPut/apiPatch/apiDelete, ApiError, errorMessage()
 src/lib/api/types.ts                  every API response type
@@ -65,7 +65,10 @@ export default function Page() {
 | Need | Use |
 | --- | --- |
 | Page title block | `PageHeader` (eyebrow/title/description/actions) |
-| Loading / error / empty | `CardSkeleton`, `LoadingState`, `ErrorState`, `EmptyState` from `components/app/states` |
+| Loading / error / empty | `PageSkeleton` (route `loading.tsx`), `CardSkeleton`, `ListSkeleton`, `LoadingState`, `ErrorState`, `EmptyState` from `components/app/states` |
+| A new ledger page (rail section, sidebar, header tabs, palette) | add it to `LEDGER_SECTIONS` in `components/ledger/ledger-nav.ts`; nothing else to wire |
+| Sidebar rows and sections | `SidebarItem`, `SidebarSection`, `SidebarFind`, `LedgerTile` from `components/app/sidebar-parts` |
+| Opening the assistant | `openAsk()` from `useLedgerContext()`; the rail and the phone tab bar call it |
 | Amounts | `Amount` (single) and `BalanceAmounts` (map of unit → number) — `precisions` from context, `invert` for income/liabilities/equity when `invert` is true, `colored` for sign colours |
 | Tree reports (statements) | `HierarchyTable` (`root`, `title`, `invert`, `summaryRows`, `initialDepth`) + `addBalances`/`negate` |
 | Charts | `BalanceLineChart` (DateBalance[] series), `IntervalBarChart` (IntervalTotal[], `mode="single"|"stacked"`), `HierarchyTreemap` (TreeNode) and primitives in `chart-primitives.tsx` (`seriesColor(i)`, `ChartTooltipCard`, `ChartLegend`, `ChartEmpty`) |
@@ -79,36 +82,51 @@ export default function Page() {
 
 `DESIGN.md` is the system; these are the app-specific applications of it.
 
-- Fonts are set globally: Inter for everything (the display and UI tiers), IBM Plex Mono for
-  account names and ledger source. No serif, no other fonts. Type tiers are utilities:
-  `type-display-xxl|xl|lg|md`, `type-heading-lg|md|sm`, `type-body-lg|md|strong`, `type-caption`,
-  `type-micro-cap` (uppercase eyebrows and section labels).
-- Colours only through tokens: `bg-primary` (aubergine, filled CTAs only), `bg-secondary` /
-  `bg-accent` (lavender), `bg-muted` / `bg-canvas-cream` (cream bands), `border` (hairline),
-  `text-muted-foreground` (ink mute), `text-link`, `text-positive` / `text-negative` (success /
-  error), `text-warning` (a semantic extension for pending states), `chart-1…8`. The aubergine
-  frame uses `bg-sidebar`, `text-sidebar-foreground`, `text-sidebar-muted`, `bg-sidebar-accent`.
+- The frame is `AppFrame`: top bar, rail, sidebar, content column, optional right panel, mobile
+  tab bar. Pages render inside the content column and never add their own chrome. Ledger pages
+  get the `ContentHeader` (title, route-derived tabs, filter toolbar) and the `AskPanel` beside them.
+  Inside a ledger the rail carries the sections and the sidebar the current section's pages; the
+  phone sheet shows rail and sidebar side by side.
+- The frame's scroll containers (content column, sidebars) are `relative`. Absolutely positioned
+  content such as `sr-only` labels and dialog headers is then clipped by the scroller instead of
+  landing in document coordinates and making the whole page scroll under the frame.
+- Every route group has a `loading.tsx` rendering `PageSkeleton`; every query renders a skeleton
+  of the right shape while pending; every mutation shows a spinner in its button and a toast on
+  error. Nothing waits silently.
+
+- Fonts are set globally: the system face (SF on Apple devices, Inter elsewhere) for everything,
+  the system monospace for account names and ledger source. Type tiers are utilities:
+  `type-large-title`, `type-title-1|2|3`, `type-headline`, `type-body`, `type-callout`,
+  `type-subhead`, `type-footnote`, `type-caption`, `type-caption-2` (uppercase eyebrows and
+  group labels).
+- Colours only through tokens: `bg-primary` (the accent, one filled button per view),
+  `bg-secondary` (accent wash with `text-secondary-foreground`), `bg-muted` / `bg-surface`
+  (grouped grey), `bg-fill` / `bg-fill-secondary` (search fields, segmented controls, skeletons),
+  `border` (hairline), `text-muted-foreground`, `text-link`, `text-positive` / `text-negative` /
+  `text-warning`, `chart-1…8`. The frame uses `bg-sidebar`, `text-sidebar-foreground`,
+  `text-sidebar-muted`, `bg-sidebar-accent`, `bg-sidebar-primary` (selected row) and `bg-rail`.
   Never raw hex in components.
-- Buttons: every button is a pill. `size="lg"` is the standard 16px / 14×28 pill, reserved for
-  the one filled aubergine CTA per view (PageHeader actions, submit buttons). `default`, `sm`,
-  `xs` are the compact pills for toolbars and tables. `secondary` is the lavender pill, `outline`
-  the 2px aubergine outline. On the aubergine frame use `outline-on-aubergine` /
-  `ghost-on-aubergine`.
-- Inline links: the `link` utility (link blue, underline on hover). Never aubergine text links.
-- Cards: `rounded-xl border bg-card` or shadcn `Card` (flat, hairline border, no shadow).
-  `Card variant="cream"` for feature bands, `variant="aubergine"` for closing CTA bands.
-  Section titles inside cards: `text-base font-semibold`.
-- Stat tiles: numerals in `type-display-md text-primary` on white ({card-stat}).
-- Elevation: cards and tables are flat. `shadow-sm` / `shadow-md` / `shadow-lg` map to DESIGN.md
-  levels 1–3 and are reserved for floating chrome (menus, dialogs, toasts, tooltips).
-- Radii: inputs 4px (`rounded-sm`), menus 8px (`rounded-md`), panes 12px (`rounded-lg`), cards
-  16px (`rounded-xl`), buttons and badges `rounded-full`.
-- Public and hero surfaces (auth pages, gallery band) use the `pastel-mesh` backdrop and the
-  aubergine band; data pages stay on plain canvas.
+- Buttons: rounded rectangles. `default` is the filled accent button, `secondary` the tinted one,
+  `outline` the hairline control, `ghost` for toolbars, `chip` the capsule filter. `size="lg"` for
+  the one primary action of a view (PageHeader actions, submit buttons); `default`, `sm`, `xs`
+  for toolbars and tables. Press feedback is built in; do not add hover colour flashes.
+- Inline links: the `link` utility (accent, underline on hover).
+- Cards: shadcn `Card` (12px radius, hairline, flat). `variant="muted"` for inset grouped
+  panels, `variant="accent"` for the one filled band a view may carry. Titles are
+  `type-headline`.
+- Stat tiles: numerals in `type-title-1 tabular text-primary`.
+- Elevation: cards and tables are flat. `shadow-xs` on outline buttons, `shadow-md` on menus and
+  popovers, `shadow-lg` on dialogs and sheets; nothing else casts a shadow.
+- Radii: controls `rounded-lg` (8px via the token scale), cards and menus `rounded-xl` (12px),
+  sheets `rounded-2xl`, dialogs `rounded-3xl`, chips and badges `rounded-full`.
+- Materials: `material-bar` for sticky bars inside a scroll container, `material-popover` for
+  menus, `material-thick` for dialogs and sheets. Content must actually scroll under a material;
+  otherwise use a solid token.
+- Public surfaces (auth pages) use the `aurora` backdrop; data pages stay on plain canvas.
 - Numbers: always `tabular` (utility class) in tables and lists; `formatNumber(value, precisions[currency] ?? 2)`.
-- Entrance motion: `animate-rise` on top-level blocks with staggered `[animation-delay:…ms]`. Nothing else should animate on load.
+- Entrance motion: `animate-rise` on top-level blocks with staggered `[animation-delay:…ms]`. Nothing else should animate on load. Anything a person can drag or toggle moves on a `motion` spring with `bounce: 0`; check `useReducedMotion()` and fall back to a fade.
 - Dark mode is derived from the aubergine surface tokens and must work automatically — test by toggling the theme button.
-- Responsive: grids collapse to one column below `lg`; tables may scroll horizontally inside `overflow-x-auto`.
+- Responsive: grids collapse to one column below `lg`; tables may scroll horizontally inside `overflow-x-auto`; below `md` the frame shows the tab bar, so pages leave the bottom 6rem free (the frame pads it) and keep 44px touch targets.
 - Empty states say what to do next (link to Import, Editor, Ask).
 - Accessibility: every icon-only button has `aria-label`; tables have header rows; interactive rows are buttons or links.
 

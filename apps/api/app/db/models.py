@@ -108,6 +108,49 @@ class Ledger(TimestampMixin, Base):
     collaborators: Mapped[list[LedgerCollaborator]] = relationship(
         back_populates="ledger", cascade="all, delete-orphan"
     )
+    # Loaded with the ledger (one extra query per result set) so listings never do N+1.
+    remote: Mapped[LedgerRemote | None] = relationship(
+        back_populates="ledger", uselist=False, lazy="selectin", cascade="all, delete-orphan"
+    )
+
+
+class LedgerRemote(TimestampMixin, Base):
+    """The repository a ledger is pushed to after every commit and pulled from on demand.
+
+    Credentials are encrypted at rest (see app.core.security); the URL never carries them.
+    """
+
+    __tablename__ = "ledger_remotes"
+
+    ledger_id: Mapped[str] = mapped_column(
+        ForeignKey("ledgers.id", ondelete="CASCADE"), primary_key=True
+    )
+    url: Mapped[str] = mapped_column(String(512))
+    transport: Mapped[str] = mapped_column(String(8))  # https | ssh | local
+    auth: Mapped[str] = mapped_column(String(8))  # none | token | ssh_key
+    token_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    branch: Mapped[str] = mapped_column(String(120))
+    # in_sync | pushing | behind | diverged | error
+    state: Mapped[str] = mapped_column(String(12), default="in_sync")
+    last_pushed_sha: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    last_synced_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    last_error: Mapped[str] = mapped_column(Text, default="")
+
+    ledger: Mapped[Ledger] = relationship(back_populates="remote")
+
+
+class UserSshKey(Base):
+    """One keypair per person, generated here; the public half is added to their git host once."""
+
+    __tablename__ = "user_ssh_keys"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    public_key: Mapped[str] = mapped_column(Text)
+    private_key_ciphertext: Mapped[str] = mapped_column(Text)
+    fingerprint: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=utcnow)
 
 
 class LedgerCollaborator(Base):

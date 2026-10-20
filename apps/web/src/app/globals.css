@@ -6,13 +6,17 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Theme contract: every value here maps to a token in /DESIGN.md (aubergine primary, cream and
- * lavender canvases, hairline borders, pill buttons, the 2/4/8/12/16/48/90 radius scale, the four
- * elevation levels). Components use these tokens only; never a raw colour.
+ * Theme contract: every value here maps to a token in /DESIGN.md. The language is Apple's (the
+ * system face with size-specific tracking, translucent materials, one accent, soft depth, press
+ * feedback) and the frame is Slack's (rail, sidebar, top bar, header tabs, composer). Components
+ * use these tokens only; never a raw colour.
  */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-fill: var(--fill);
+  --color-fill-secondary: var(--fill-secondary);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -24,6 +28,9 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar: var(--sidebar);
+  --color-rail: var(--rail);
+  --color-rail-foreground: var(--rail-foreground);
+  --color-rail-accent: var(--rail-accent);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -57,27 +64,25 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --color-surface: var(--surface);
-  --color-canvas-cream: var(--canvas-cream);
-  --color-canvas-lavender: var(--canvas-lavender);
-  /* {rounded.*}: xs 2 · sm 4 · md 8 · lg 12 · xl 16 · xxl 48 · pill 90 */
-  --radius-xs: 2px;
-  --radius-sm: 4px;
+  /* {rounded.*}: controls 6–8, panes 10, cards 12, sheets 16, dialogs 20, capsules 9999 */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 48px;
-  --radius-3xl: 48px;
-  --radius-4xl: 90px;
-  /* Elevation levels 1–3 replace Tailwind's shadow scale; level 0 (flat) is the default surface. */
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --radius-4xl: 9999px;
+  /* Depth: three soft levels for floating chrome; resting surfaces are flat. */
   --shadow-xs: var(--shadow-level-1);
   --shadow-sm: var(--shadow-level-1);
   --shadow-md: var(--shadow-level-2);
   --shadow-lg: var(--shadow-level-3);
   --shadow-xl: var(--shadow-level-3);
   --shadow-float: var(--shadow-level-3);
-  --animate-rise: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
-  --animate-fade: fade 0.35s ease-out both;
+  --animate-rise: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-fade: fade 0.25s ease-out both;
+  --animate-materialize: materialize 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-ticker: ticker 48s linear infinite;
   @keyframes collapsible-down {
     from { height: 0; }
@@ -88,12 +93,16 @@
     to { height: 0; }
   }
   @keyframes rise {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
   @keyframes fade {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+  @keyframes materialize {
+    from { opacity: 0; transform: scale(0.97); filter: blur(4px); }
+    to { opacity: 1; transform: scale(1); filter: blur(0); }
   }
   @keyframes ticker {
     from { transform: translateY(0); }
@@ -101,122 +110,122 @@
   }
 }
 
-/* Light: the DESIGN.md palette verbatim. */
+/* Light: white canvas, Apple greys, system blue. */
 :root {
+  /* The platform face first (SF on Apple devices), Inter where there is none. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", ui-sans-serif, var(--font-inter), "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, var(--font-plex-mono), Consolas, monospace;
   --background: #ffffff;
-  --foreground: #1d1d1d;
-  --surface: #f4ede4;
-  --canvas-cream: #f4ede4;
-  --canvas-lavender: #f9f0ff;
+  --foreground: #1d1d1f;
+  --surface: #f5f5f7;
+  --fill: rgb(120 120 128 / 0.16);
+  --fill-secondary: rgb(120 120 128 / 0.1);
   --card: #ffffff;
-  --card-foreground: #1d1d1d;
-  --popover: #ffffff;
-  --popover-foreground: #1d1d1d;
-  --primary: #4a154b;
-  --primary-press: #611f69;
+  --card-foreground: #1d1d1f;
+  --popover: rgb(255 255 255 / 0.84);
+  --popover-foreground: #1d1d1f;
+  --primary: #007aff;
+  --primary-press: #0066d6;
   --primary-foreground: #ffffff;
-  --secondary: #f9f0ff;
-  --secondary-foreground: #1d1d1d;
-  --muted: #f4ede4;
-  --muted-foreground: #696969;
-  --accent: #f9f0ff;
-  --accent-foreground: #1d1d1d;
-  --destructive: #cc4117;
-  --positive: #007a5a;
+  --secondary: rgb(0 122 255 / 0.12);
+  --secondary-foreground: #0066cc;
+  --muted: #f5f5f7;
+  --muted-foreground: #6e6e73;
+  --accent: rgb(120 120 128 / 0.12);
+  --accent-foreground: #1d1d1f;
+  --destructive: #ff3b30;
+  --positive: #248a3d;
   --positive-foreground: #ffffff;
-  --negative: #cc4117;
+  --negative: #d70015;
   --negative-foreground: #ffffff;
-  /* Semantic extension: DESIGN.md defines error and success only; pending/caution states need a third status. */
-  --warning: #9a6a12;
-  --warning-foreground: #1d1d1d;
-  --link: #1264a3;
-  --link-hover: #3860be;
-  --border: #e6e6e6;
-  --input: #e6e6e6;
-  --ring: #611f69;
-  --chart-1: #7b3a86;
-  --chart-2: #d9782c;
-  --chart-3: #1264a3;
-  --chart-4: #9a6a12;
-  --chart-5: #5a63d9;
-  --chart-6: #3fa36b;
-  --chart-7: #a02a60;
-  --chart-8: #1aa3b5;
-  /* The Slack-style aubergine frame: sidebar and top bar. Active item is link blue, as in the aubergine theme. */
-  --sidebar: #4a154b;
-  --sidebar-foreground: #ffffff;
-  --sidebar-muted: #d9bdde;
-  --sidebar-primary: #1264a3;
+  --warning: #b25000;
+  --warning-foreground: #ffffff;
+  --link: #0066cc;
+  --link-hover: #004bb5;
+  --border: rgb(60 60 67 / 0.14);
+  --input: rgb(60 60 67 / 0.22);
+  --ring: #007aff;
+  --chart-1: #007aff;
+  --chart-2: #34c759;
+  --chart-3: #ff9500;
+  --chart-4: #af52de;
+  --chart-5: #5ac8fa;
+  --chart-6: #ff2d55;
+  --chart-7: #5856d6;
+  --chart-8: #ffcc00;
+  /* The Slack frame on a light canvas: grouped grey sidebar, a slightly deeper rail. */
+  --sidebar: #f5f5f7;
+  --sidebar-foreground: #1d1d1f;
+  --sidebar-muted: #6e6e73;
+  --sidebar-primary: #007aff;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: color-mix(in srgb, #ffffff 12%, transparent);
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #592466;
-  --sidebar-ring: #d9bdde;
-  --shadow-level-1: 0 5px 20px 0 rgb(0 0 0 / 0.1);
-  --shadow-level-2: 0 0 32px 0 rgb(0 0 0 / 0.1);
-  --shadow-level-3: 0 1px 10px 0 rgb(0 0 0 / 0.2);
-  --shadow-level-4: inset 0 0 0 1px #611f69;
-  --mesh-peach: #fff0e6;
-  --mesh-lavender: #e9d8ff;
-  --mesh-green: #dcebd8;
+  --sidebar-accent: rgb(0 0 0 / 0.06);
+  --sidebar-accent-foreground: #1d1d1f;
+  --sidebar-border: rgb(60 60 67 / 0.12);
+  --sidebar-ring: #007aff;
+  --rail: #ebebef;
+  --rail-foreground: #3a3a3c;
+  --rail-accent: rgb(0 0 0 / 0.08);
+  --shadow-level-1: 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04);
+  --shadow-level-2: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.06);
+  --shadow-level-3: 0 24px 64px rgb(0 0 0 / 0.2), 0 8px 20px rgb(0 0 0 / 0.1);
 }
 
-/* Dark: derived from the aubergine surface tokens (surface-aubergine, on-primary, on-aubergine-mute). */
+/* Dark: the Slack dark surfaces from the reference, Apple's dark-mode colours on top. */
 .dark {
-  --background: #1a0f1b;
-  --foreground: #ffffff;
-  --surface: #241626;
-  --canvas-cream: #241626;
-  --canvas-lavender: #2c1a2e;
-  --card: #221322;
-  --card-foreground: #ffffff;
-  --popover: #261527;
-  --popover-foreground: #ffffff;
-  --primary: #9b4fa6;
-  --primary-press: #b066bb;
+  --background: #1a1d21;
+  --foreground: #e9e9eb;
+  --surface: #222529;
+  --fill: rgb(120 120 128 / 0.24);
+  --fill-secondary: rgb(120 120 128 / 0.16);
+  --card: #222529;
+  --card-foreground: #e9e9eb;
+  --popover: rgb(34 37 41 / 0.88);
+  --popover-foreground: #e9e9eb;
+  --primary: #0a84ff;
+  --primary-press: #409cff;
   --primary-foreground: #ffffff;
-  --secondary: #3a2240;
-  --secondary-foreground: #ffffff;
-  --muted: #2d1a2f;
-  --muted-foreground: #d9bdde;
-  --accent: #3a2240;
+  --secondary: rgb(10 132 255 / 0.18);
+  --secondary-foreground: #6cb2ff;
+  --muted: #2a2d31;
+  --muted-foreground: #9b9ca1;
+  --accent: rgb(255 255 255 / 0.08);
   --accent-foreground: #ffffff;
-  --destructive: #e8653d;
-  --positive: #2fb38e;
-  --positive-foreground: #1a0f1b;
-  --negative: #e8653d;
-  --negative-foreground: #1a0f1b;
-  --warning: #e0b04a;
-  --warning-foreground: #1a0f1b;
-  --link: #5aa6e8;
-  --link-hover: #7ab8f0;
-  --border: #3a2740;
-  --input: #3a2740;
-  --ring: #d9bdde;
-  --chart-1: #a86bb2;
-  --chart-2: #cf6f2a;
-  --chart-3: #3f8fd6;
-  --chart-4: #a8821f;
-  --chart-5: #8087e8;
-  --chart-6: #46a26a;
-  --chart-7: #c0397a;
-  --chart-8: #2fa3b5;
-  --sidebar: #4a154b;
-  --sidebar-foreground: #ffffff;
-  --sidebar-muted: #d9bdde;
-  --sidebar-primary: #1264a3;
+  --destructive: #ff453a;
+  --positive: #30d158;
+  --positive-foreground: #0b2e12;
+  --negative: #ff453a;
+  --negative-foreground: #ffffff;
+  --warning: #ffb340;
+  --warning-foreground: #2b1a00;
+  --link: #409cff;
+  --link-hover: #6cb2ff;
+  --border: rgb(255 255 255 / 0.1);
+  --input: rgb(255 255 255 / 0.14);
+  --ring: #0a84ff;
+  --chart-1: #0a84ff;
+  --chart-2: #30d158;
+  --chart-3: #ff9f0a;
+  --chart-4: #bf5af2;
+  --chart-5: #64d2ff;
+  --chart-6: #ff375f;
+  --chart-7: #5e5ce6;
+  --chart-8: #ffd60a;
+  --sidebar: #1a1d21;
+  --sidebar-foreground: #d1d2d3;
+  --sidebar-muted: #9b9ca1;
+  --sidebar-primary: #0a84ff;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: color-mix(in srgb, #ffffff 12%, transparent);
+  --sidebar-accent: rgb(255 255 255 / 0.08);
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #592466;
-  --sidebar-ring: #d9bdde;
-  --shadow-level-1: 0 5px 20px 0 rgb(0 0 0 / 0.4);
-  --shadow-level-2: 0 0 32px 0 rgb(0 0 0 / 0.4);
-  --shadow-level-3: 0 1px 10px 0 rgb(0 0 0 / 0.6);
-  --shadow-level-4: inset 0 0 0 1px #d9bdde;
-  --mesh-peach: #3d2430;
-  --mesh-lavender: #33204a;
-  --mesh-green: #22302a;
+  --sidebar-border: rgb(255 255 255 / 0.08);
+  --sidebar-ring: #0a84ff;
+  --rail: #121417;
+  --rail-foreground: #d1d2d3;
+  --rail-accent: rgb(255 255 255 / 0.1);
+  --shadow-level-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-level-2: 0 8px 24px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.3);
+  --shadow-level-3: 0 24px 64px rgb(0 0 0 / 0.6), 0 8px 20px rgb(0 0 0 / 0.4);
 }
 
 @layer base {
@@ -225,37 +234,49 @@
   }
   html {
     @apply font-sans antialiased;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
   }
   body {
     @apply bg-background text-foreground;
-    line-height: 1.55;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
   }
   h1, h2, h3 {
-    @apply font-bold;
+    @apply font-semibold;
   }
   ::selection {
-    background: color-mix(in oklch, var(--primary) 22%, transparent);
+    background: color-mix(in srgb, var(--primary) 24%, transparent);
   }
   code, kbd, pre, samp, .font-mono {
     font-feature-settings: "liga" 0;
+    letter-spacing: 0;
+  }
+  /* Reduced motion keeps the cross-fades that aid comprehension and drops the movement. */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-rise, .animate-materialize { animation: fade 0.2s ease-out both; }
+    .animate-ticker { animation: none; }
   }
 }
 
-/* {typography.*} tiers from DESIGN.md. */
-@utility type-display-xxl { font-size: 64px; line-height: 1.12; font-weight: 700; letter-spacing: -0.768px; }
-@utility type-display-xl { font-size: 58px; line-height: 1.25; font-weight: 600; letter-spacing: -0.464px; }
-@utility type-display-lg { font-size: 50px; line-height: 1.12; font-weight: 700; letter-spacing: -0.6px; }
-@utility type-display-md { font-size: 32px; line-height: 1.25; font-weight: 700; letter-spacing: -0.256px; }
-@utility type-heading-lg { font-size: 24px; line-height: 1.33; font-weight: 700; letter-spacing: -0.096px; }
-@utility type-heading-md { font-size: 22px; line-height: 1.4; font-weight: 600; letter-spacing: 0; }
-@utility type-heading-sm { font-size: 18px; line-height: 1.56; font-weight: 600; letter-spacing: -0.0216px; }
-@utility type-body-lg { font-size: 18px; line-height: 1.55; font-weight: 400; letter-spacing: -0.0216px; }
-@utility type-body-md { font-size: 16px; line-height: 1.55; font-weight: 400; letter-spacing: 0; }
-@utility type-body-strong { font-size: 16px; line-height: 1.5; font-weight: 700; letter-spacing: 0.16px; }
-@utility type-caption { font-size: 14px; line-height: 1.43; font-weight: 400; letter-spacing: 0.1px; }
-@utility type-micro-cap { font-size: 12px; line-height: 1; font-weight: 700; letter-spacing: 0.96px; text-transform: uppercase; }
+/*
+ * {type.*}: Apple text styles, 15px body. Tracking is size-specific: tight on titles, near zero
+ * on body, slightly open on captions. Build hierarchy from weight and size together.
+ */
+@utility type-large-title { font-size: clamp(1.75rem, 1.35rem + 1.2vw, 2.125rem); line-height: 1.18; font-weight: 700; letter-spacing: -0.022em; }
+@utility type-title-1 { font-size: 1.75rem; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
+@utility type-title-2 { font-size: 1.375rem; line-height: 1.27; font-weight: 700; letter-spacing: -0.016em; }
+@utility type-title-3 { font-size: 1.25rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.012em; }
+@utility type-headline { font-size: 0.9375rem; line-height: 1.33; font-weight: 600; letter-spacing: -0.01em; }
+@utility type-body { font-size: 0.9375rem; line-height: 1.4; font-weight: 400; letter-spacing: -0.01em; }
+@utility type-callout { font-size: 0.875rem; line-height: 1.36; font-weight: 400; letter-spacing: -0.006em; }
+@utility type-subhead { font-size: 0.8125rem; line-height: 1.38; font-weight: 400; letter-spacing: -0.004em; }
+@utility type-footnote { font-size: 0.75rem; line-height: 1.33; font-weight: 400; letter-spacing: 0; }
+@utility type-caption { font-size: 0.6875rem; line-height: 1.27; font-weight: 500; letter-spacing: 0.004em; }
+@utility type-caption-2 { font-size: 0.6875rem; line-height: 1.2; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 
-/* {link-on-light}: link blue, underline on hover only. */
+/* Links: accent text, underline on hover only. */
 @utility link {
   color: var(--link);
   text-decoration-line: none;
@@ -267,18 +288,57 @@
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Pastel-mesh gradient backdrop: peach, lavender and dusty green stops on the cream canvas. */
-@utility pastel-mesh {
-  background-color: var(--canvas-cream);
+/* Press feedback lives on the press itself: instant, slight, and reversed on release. */
+@utility press {
+  &:active:not(:disabled) { transform: scale(0.97); }
+}
+
+/*
+ * Materials: translucent layers with content scrolling underneath. Weight encodes hierarchy —
+ * the sidebar is heavier than a bar, a bar heavier than a popover. Never stack two light ones.
+ */
+@utility material-bar {
+  background: color-mix(in srgb, var(--background) 78%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  @media (prefers-reduced-transparency: reduce) { background: var(--background); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@utility material-sidebar {
+  background: color-mix(in srgb, var(--sidebar) 90%, transparent);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
+  @media (prefers-reduced-transparency: reduce) { background: var(--sidebar); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@utility material-popover {
+  background: var(--popover);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  @media (prefers-reduced-transparency: reduce) { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  @media (prefers-contrast: more) { background: var(--card); border-color: var(--foreground); }
+}
+@utility material-thick {
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  backdrop-filter: blur(40px) saturate(160%);
+  @media (prefers-reduced-transparency: reduce) { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* Soft backdrop for public surfaces (sign-in): two cool tints on the grouped grey, nothing more. */
+@utility aurora {
+  background-color: var(--surface);
   background-image:
-    radial-gradient(70% 55% at 12% 8%, var(--mesh-peach), transparent 70%),
-    radial-gradient(60% 60% at 88% 18%, var(--mesh-lavender), transparent 70%),
-    radial-gradient(55% 50% at 55% 100%, var(--mesh-green), transparent 72%);
+    radial-gradient(60% 50% at 15% 10%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 70%),
+    radial-gradient(50% 45% at 85% 90%, color-mix(in srgb, var(--chart-7) 12%, transparent), transparent 70%);
+}
+
+/* Scroll edge instead of a hard divider: the first pixels under floating chrome fade in. */
+@utility scroll-edge-top {
+  mask-image: linear-gradient(to bottom, transparent, black 10px);
 }
 
 @utility scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklch, var(--foreground) 20%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--foreground) 22%, transparent) transparent;
 }
 
 @custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));

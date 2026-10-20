@@ -5,13 +5,19 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, Response
 from sqlalchemy import func, select
 
-from app.core.deps import AuthDep, DbDep, SessionUserDep, UserDep, resolve_role
-from app.core.security import verify_password
-from app.db.models import Ledger, LedgerStar, User
+from app.core.deps import AuthDep, DbDep, SessionUserDep, SettingsDep, UserDep, resolve_role
+from app.core.security import encrypt_secret, generate_ssh_keypair, verify_password
+from app.db.models import Ledger, LedgerRemote, LedgerStar, User, UserSshKey
 from app.errors import ConflictError, NotFoundError, UnauthorizedError
 from app.ledgers.store import get_store
 from app.logging_setup import get_logger
-from app.schemas import DeleteAccountRequest, PublicUserOut, UpdateProfileRequest, UserOut
+from app.schemas import (
+    DeleteAccountRequest,
+    PublicUserOut,
+    SshKeyOut,
+    UpdateProfileRequest,
+    UserOut,
+)
 
 log = get_logger(__name__)
 router = APIRouter(prefix="/users", tags=["users"])
@@ -47,6 +53,55 @@ async def delete_me(body: DeleteAccountRequest, user: SessionUserDep, db: DbDep)
     await db.delete(user)
     await db.commit()
     log.info("user %s deleted their account", user.username)
+    return Response(status_code=204)
+
+
+@router.get("/me/ssh-key", response_model=SshKeyOut)
+async def get_ssh_key(user: UserDep, db: DbDep):
+    row = await db.get(UserSshKey, user.id)
+    if row is None:
+        raise NotFoundError("You have no SSH key yet")
+    return SshKeyOut.model_validate(row)
+
+
+@router.post("/me/ssh-key", response_model=SshKeyOut, status_code=201)
+async def create_ssh_key(user: SessionUserDep, db: DbDep, settings: SettingsDep):
+    """One keypair per account, generated here; add the public key to your git host once."""
+    if await db.get(UserSshKey, user.id) is not None:
+        raise ConflictError("You already have an SSH key; remove it first to generate a new one")
+    private_key, public_key, fingerprint = generate_ssh_keypair(f"beancount-studio:{user.username}")
+    row = UserSshKey(
+        user_id=user.id,
+        public_key=public_key,
+        private_key_ciphertext=encrypt_secret(private_key, settings.secret_key),
+        fingerprint=fingerprint,
+    )
+    db.add(row)
+    await db.commit()
+    log.info("user %s generated an SSH key (%s)", user.username, fingerprint)
+    return SshKeyOut.model_validate(row)
+
+
+@router.delete("/me/ssh-key", status_code=204)
+async def delete_ssh_key(user: SessionUserDep, db: DbDep):
+    row = await db.get(UserSshKey, user.id)
+    if row is None:
+        raise NotFoundError("You have no SSH key")
+    in_use = (
+        await db.execute(
+            select(func.count())
+            .select_from(LedgerRemote)
+            .join(Ledger, Ledger.id == LedgerRemote.ledger_id)
+            .where(Ledger.owner_id == user.id, LedgerRemote.auth == "ssh_key")
+        )
+    ).scalar_one()
+    if in_use:
+        raise ConflictError(
+            f"{in_use} of your ledgers push with this key; disconnect their remotes first"
+        )
+    await db.delete(row)
+    await db.commit()
+    log.info("user %s removed their SSH key", user.username)
     return Response(status_code=204)
 
 

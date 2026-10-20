@@ -1,32 +1,17 @@
 "use client";
 
 import {
-  ArrowLeftRightIcon,
-  BarChart3Icon,
-  BookOpenIcon,
-  CoinsIcon,
-  DatabaseIcon,
-  FileTextIcon,
-  FolderIcon,
-  HistoryIcon,
-  LayoutDashboardIcon,
   LayoutGridIcon,
   ListTreeIcon,
   MoonIcon,
-  PieChartIcon,
-  ScanLineIcon,
-  SettingsIcon,
-  SparklesIcon,
   SunIcon,
-  TrendingUpIcon,
-  UploadIcon,
-  WalletIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useMemo, useState } from "react";
 import { create } from "zustand";
 import { accountHref, useLedgerContext } from "@/components/ledger/ledger-context";
+import { LEDGER_SECTIONS } from "@/components/ledger/ledger-nav";
 import {
   CommandDialog,
   CommandEmpty,
@@ -52,27 +37,7 @@ export const useCommandPalette = create<PaletteState>((set) => ({
   toggle: () => set((s) => ({ isOpen: !s.isOpen })),
 }));
 
-const PAGES = [
-  { label: "Overview", path: "", icon: LayoutDashboardIcon },
-  { label: "Journal", path: "/journal", icon: BookOpenIcon },
-  { label: "Accounts", path: "/accounts", icon: ListTreeIcon },
-  { label: "Budget", path: "/budget", icon: WalletIcon },
-  { label: "Income statement", path: "/income-statement", icon: TrendingUpIcon },
-  { label: "Balance sheet", path: "/balance-sheet", icon: BarChart3Icon },
-  { label: "Cash flow", path: "/cash-flow", icon: ArrowLeftRightIcon },
-  { label: "Trial balance", path: "/trial-balance", icon: BarChart3Icon },
-  { label: "Holdings", path: "/holdings", icon: PieChartIcon },
-  { label: "Statistics", path: "/statistics", icon: DatabaseIcon },
-  { label: "Import statement", path: "/import", icon: UploadIcon },
-  { label: "Scan receipt", path: "/receipt", icon: ScanLineIcon },
-  { label: "Ask the assistant", path: "/ask", icon: SparklesIcon },
-  { label: "Query (BQL)", path: "/query", icon: DatabaseIcon },
-  { label: "Commodities", path: "/commodities", icon: CoinsIcon },
-  { label: "Documents", path: "/documents", icon: FileTextIcon },
-  { label: "Files", path: "/files", icon: FolderIcon },
-  { label: "History", path: "/commits", icon: HistoryIcon },
-  { label: "Ledger settings", path: "/settings", icon: SettingsIcon },
-];
+const PAGES = LEDGER_SECTIONS.flatMap((section) => section.items);
 
 export function CommandPalette() {
   const { isOpen, close } = useCommandPalette();
