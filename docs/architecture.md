@@ -51,6 +51,18 @@ ledger and executed off the event loop, because the Fava ledger object is synchr
 take the ledger's write lock and finish with a commit. Every report and journal function lives
 in `apps/api/app/ledgers/engine.py` and returns JSON-safe dictionaries.
 
+## Remotes and GitHub sync
+
+A ledger can be created from an existing repository (an `https` or `ssh` URL, or, for
+administrators, a path on the server) and keeps its full history; a template-made ledger can be
+connected to a remote later. Every commit Studio makes is pushed right afterwards, off the
+request path, and Sync pulls on demand: fetch, fast-forward or rebase, push. Conflicts stop with
+a `diverged` state until an admin keeps one side. `RemoteSync` in
+`apps/api/app/ledgers/remotes.py` owns this and hooks `LedgerStore.commit` through a listener.
+Credentials are one SSH keypair per person (public half added to the git host once) or a token;
+both are encrypted at rest under `BS_SECRET_KEY` and handed to git only for the duration of a
+call. See ADR 0002.
+
 ## Web client and API
 
 The web app never talks to Beancount directly. It calls the API through same-origin `/api/*`

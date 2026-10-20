@@ -125,6 +125,11 @@ async def get_auth(request: Request, db: DbDep, settings: SettingsDep) -> AuthCo
             user = await _user_from_session(db, cookie, settings)
             if user is not None:
                 auth = AuthContext(user=user, kind="session")
+            else:
+                # The cookie names a session that no longer exists (signed out elsewhere, expired,
+                # database reset). The web proxy treats the cookie's presence as "signed in", so
+                # the error response has to clear it or /login stays unreachable from this browser.
+                request.state.stale_session_cookie = settings.cookie_name
     request.state.auth = auth
     return auth
 

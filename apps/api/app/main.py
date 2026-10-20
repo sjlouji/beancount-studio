@@ -11,6 +11,7 @@ from app import __version__
 from app.config import get_settings
 from app.db.base import dispose_db, init_db
 from app.errors import install_error_handlers
+from app.ledgers.remotes import get_remote_sync
 from app.logging_setup import configure_logging, get_logger
 from app.routers import (
     api_keys,
@@ -22,6 +23,7 @@ from app.routers import (
     imports,
     ledgers,
     receipts,
+    remotes,
     reports,
     system,
     uploads,
@@ -36,6 +38,7 @@ async def lifespan(_: FastAPI):
     settings = get_settings()
     configure_logging(settings.log_level)
     await init_db()
+    await get_remote_sync().recover()
     log.info(
         "%s API %s ready (data dir %s, ai=%s)",
         settings.app_name,
@@ -44,6 +47,7 @@ async def lifespan(_: FastAPI):
         settings.ai_enabled,
     )
     yield
+    await get_remote_sync().drain()
     await dispose_db()
 
 
@@ -64,6 +68,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     install_error_handlers(app)
+    get_remote_sync().install()  # every ledger commit is pushed to its remote, if it has one
     for router in (
         system.router,
         auth.router,
@@ -76,6 +81,8 @@ def create_app() -> FastAPI:
         commits.router,
         imports.router,
         receipts.router,
+        remotes.router,
+        remotes.git_router,
         uploads.router,
         chat.router,
     ):

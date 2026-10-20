@@ -118,6 +118,20 @@ class DeleteAccountRequest(BaseModel):
 
 
 # --------------------------------------------------------------------- ledgers
+class RemoteConnectRequest(BaseModel):
+    """A repository to connect to: where it is and how Studio may reach it."""
+
+    url: str = Field(min_length=1, max_length=512)
+    auth: Literal["none", "token", "ssh_key"] = "none"
+    token: str | None = Field(default=None, max_length=512)
+
+
+class LedgerSourceRequest(RemoteConnectRequest):
+    main_file: str | None = Field(default=None, max_length=255, alias="mainFile")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class LedgerCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     slug: str | None = Field(default=None, max_length=80)
@@ -125,6 +139,8 @@ class LedgerCreateRequest(BaseModel):
     visibility: Literal["private", "public"] = "private"
     template: Literal["blank", "starter", "example"] = "starter"
     currency: str = Field(default="USD", min_length=1, max_length=24)
+    # When set, the ledger is cloned from this repository instead of created from a template.
+    source: LedgerSourceRequest | None = None
 
     @field_validator("currency")
     @classmethod
@@ -142,6 +158,40 @@ class LedgerUpdateRequest(BaseModel):
     visibility: Literal["private", "public"] | None = None
 
 
+class RemoteOut(BaseModel):
+    url: str
+    transport: str
+    auth: str
+    branch: str
+    state: str
+    last_pushed_sha: str | None = Field(alias="lastPushedSha")
+    last_synced_at: datetime | None = Field(alias="lastSyncedAt")
+    last_error: str = Field(alias="lastError")
+    updated_at: datetime = Field(alias="updatedAt")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True, serialize_by_alias=True)
+
+
+class SshKeyOut(BaseModel):
+    """The account's SSH key; the private half never leaves the server."""
+
+    public_key: str = Field(alias="publicKey")
+    fingerprint: str
+    created_at: datetime = Field(alias="createdAt")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True, serialize_by_alias=True)
+
+
+class RemoteResolveRequest(BaseModel):
+    keep: Literal["local", "remote"]
+
+
+class GitTestOut(BaseModel):
+    default_branch: str | None = Field(alias="defaultBranch")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
 class LedgerOut(BaseModel):
     id: str
     owner: str
@@ -157,6 +207,7 @@ class LedgerOut(BaseModel):
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
     last_commit: dict[str, Any] | None = Field(default=None, alias="lastCommit")
+    remote: RemoteOut | None = None
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
