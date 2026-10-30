@@ -178,6 +178,9 @@ async function pollSignIn(): Promise<void> {
     if (pendingSignIn !== pending) return; // cancelled while the request was in flight
     cancelSignIn();
     log.info("signed in through the browser", pending.origin);
+    // Chromium writes cookie changes to disk lazily. Quitting (or Ctrl-C in development) soon
+    // after signing in would otherwise lose the session and restart the browser flow next launch.
+    await session.defaultSession.cookies.flushStore();
     await loadServer(pending.origin);
     mainWindow?.show();
     mainWindow?.focus();

@@ -66,14 +66,19 @@ def _error_body(code: str, message: str, details: dict[str, Any] | None = None) 
 
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
-    async def _app_error(_: Request, exc: AppError) -> JSONResponse:
+    async def _app_error(request: Request, exc: AppError) -> JSONResponse:
         if exc.status_code >= 500:
             log.error("app error %s: %s", exc.code, exc.message, exc_info=exc)
         else:
             log.info("app error %s: %s", exc.code, exc.message)
-        return JSONResponse(
+        response = JSONResponse(
             status_code=exc.status_code, content=_error_body(exc.code, exc.message, exc.details)
         )
+        # Set by get_auth when the request carried a session cookie that no longer resolves.
+        stale_cookie = getattr(request.state, "stale_session_cookie", None)
+        if stale_cookie:
+            response.delete_cookie(stale_cookie, path="/")
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:

@@ -133,7 +133,7 @@ export function FilterBar({ className, showInterval = true, showConversion = tru
   const currencies = attributes?.currencies ?? meta?.operatingCurrencies ?? [];
   const operating = meta?.operatingCurrencies ?? [];
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div className={cn("flex items-center gap-2 overflow-x-auto py-0.5 scrollbar-thin *:shrink-0 md:flex-wrap md:overflow-visible", className)}>
       <TimeInput key={`time:${params.time ?? ""}`} />
       <AccountCombobox
         value={params.account ?? ""}

@@ -34,7 +34,7 @@ assistant whose edits are shown as diffs and committed only after you approve th
 | Receipts | Upload a photo or PDF; the model extracts date, payee, total and currency and suggests accounts; the file is stored next to the ledger and linked from the transaction. |
 | Assistant | Chat with your ledger: BQL queries, reports, file reads and searches. Edits go through an approval card showing the diff and bean-check result. Threads are kept per ledger. |
 | Data pages | Accounts (tree and table, open and close), commodities and price charts, documents with previews, events timeline, errors with jump-to-line, a BQL workbench with sortable results and CSV download. |
-| Accounts and sharing | Email and password accounts (the first user is the administrator), public or private ledgers, a public gallery, per-ledger collaborators with read, write or admin roles, stars, personal access tokens with read and write scopes, password reset by email when SMTP is configured. |
+| Accounts and sharing | Email and password accounts (the first user is the administrator), public or private ledgers, per-ledger collaborators with read, write or admin roles, stars, personal access tokens with read and write scopes, password reset by email when SMTP is configured. |
 
 ## What you get
 

@@ -71,6 +71,40 @@ export interface Ledger {
   createdAt: string;
   updatedAt: string;
   lastCommit: Commit | null;
+  remote: LedgerRemote | null;
+}
+
+export type RemoteAuth = "none" | "token" | "ssh_key";
+export type RemoteState = "in_sync" | "pushing" | "behind" | "diverged" | "error";
+
+/** Where a ledger is pushed after every commit; mirrors RemoteOut in schemas.py. */
+export interface LedgerRemote {
+  url: string;
+  transport: "https" | "ssh" | "local";
+  auth: RemoteAuth;
+  branch: string;
+  state: RemoteState;
+  lastPushedSha: string | null;
+  lastSyncedAt: string | null;
+  lastError: string;
+  updatedAt: string;
+}
+
+export interface RemoteConnectInput {
+  url: string;
+  auth: RemoteAuth;
+  token?: string;
+}
+
+export interface GitTestResult {
+  defaultBranch: string | null;
+}
+
+/** The account's SSH keypair; only the public half ever leaves the server. */
+export interface SshKey {
+  publicKey: string;
+  fingerprint: string;
+  createdAt: string;
 }
 
 export interface Collaborator {

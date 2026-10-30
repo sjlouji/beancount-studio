@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import re
 import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -94,25 +96,76 @@ class GitError(LedgerError):
     code = "git_error"
 
 
+class PushRejected(GitError):
+    """The remote branch has commits this repository does not have (non-fast-forward)."""
+
+    code = "push_rejected"
+
+
+@dataclass(frozen=True)
+class GitResult:
+    code: int
+    stdout: str
+    stderr: str
+
+
+# Never let git wait for a human: prompts fail instead of hanging a request or a background push.
+_BASE_ENV = {"GIT_TERMINAL_PROMPT": "0"}
+_REJECTED = re.compile(r"non-fast-forward|fetch first|\[rejected\]|stale info", re.IGNORECASE)
+_CONFLICT_FILE = re.compile(r"Merge conflict in (.+)$", re.MULTILINE)
+
+
+async def run_git(
+    args: tuple[str, ...] | list[str],
+    cwd: Path,
+    *,
+    env: dict[str, str] | None = None,
+    input_bytes: bytes | None = None,
+    time_limit: float | None = None,
+) -> GitResult:
+    """Run git and return its exit code and output; `time_limit` (seconds) kills it and raises."""
+    proc = await asyncio.create_subprocess_exec(
+        "git",
+        *args,
+        cwd=cwd,
+        env={**os.environ, **_BASE_ENV, **(env or {})},
+        stdin=asyncio.subprocess.PIPE if input_bytes is not None else None,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        async with asyncio.timeout(time_limit):
+            out, err = await proc.communicate(input_bytes)
+    except TimeoutError:
+        proc.kill()
+        await proc.wait()
+        log.error("git %s timed out after %ss in %s", shlex.join(args), time_limit, cwd)
+        raise GitError(f"git {args[0]} timed out after {time_limit:g} seconds") from None
+    return GitResult(
+        proc.returncode or 0, out.decode("utf-8", "replace"), err.decode("utf-8", "replace")
+    )
+
+
 class GitRepo:
     def __init__(self, path: Path) -> None:
         self.path = path
 
-    async def _run(self, *args: str, check: bool = True, input_bytes: bytes | None = None) -> str:
-        proc = await asyncio.create_subprocess_exec(
-            "git",
-            *args,
-            cwd=self.path,
-            stdin=asyncio.subprocess.PIPE if input_bytes is not None else None,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+    async def _run(
+        self,
+        *args: str,
+        check: bool = True,
+        input_bytes: bytes | None = None,
+        env: dict[str, str] | None = None,
+        time_limit: float | None = None,
+    ) -> str:
+        result = await run_git(
+            args, self.path, env=env, input_bytes=input_bytes, time_limit=time_limit
         )
-        out, err = await proc.communicate(input_bytes)
-        if check and proc.returncode != 0:
-            message = err.decode("utf-8", "replace").strip()
+        if check and result.code != 0:
+            message = result.stderr.strip()
             log.error("git %s failed in %s: %s", shlex.join(args), self.path, message)
             raise GitError(f"git {args[0]} failed: {message}")
-        return out.decode("utf-8", "replace")
+        return result.stdout
 
     async def _run_bytes(self, *args: str) -> bytes:
         proc = await asyncio.create_subprocess_exec(
@@ -134,9 +187,142 @@ class GitRepo:
         await asyncio.to_thread(path.mkdir, parents=True, exist_ok=True)
         repo = cls(path)
         await repo._run("init", "-q", "-b", "main")
-        await repo._run("config", "core.autocrlf", "false")
-        await repo._run("config", "commit.gpgsign", "false")
+        await repo._configure()
         return repo
+
+    @classmethod
+    async def clone(
+        cls, url: str, path: Path, *, env: dict[str, str] | None = None, time_limit: float
+    ) -> GitRepo:
+        """Clone `url` into `path` (which must not exist yet) with its full history."""
+        await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
+        result = await run_git(
+            ["clone", "-q", "--", url, str(path)], path.parent, env=env, time_limit=time_limit
+        )
+        if result.code != 0:
+            message = result.stderr.strip()
+            log.error("git clone of %s failed: %s", url, message)
+            raise GitError(f"git clone failed: {message}")
+        repo = cls(path)
+        await repo._configure()
+        return repo
+
+    async def _configure(self) -> None:
+        await self._run("config", "core.autocrlf", "false")
+        await self._run("config", "commit.gpgsign", "false")
+
+    @staticmethod
+    async def is_repo(path: Path) -> bool:
+        """True for a working tree or a bare repository at `path`."""
+        if not await asyncio.to_thread(path.is_dir):
+            return False
+        return (await run_git(["rev-parse", "--git-dir"], path)).code == 0
+
+    @staticmethod
+    async def default_branch(
+        url: str, *, env: dict[str, str] | None = None, time_limit: float, cwd: Path
+    ) -> str | None:
+        """Ask a remote which branch HEAD points at, without cloning; None for an empty remote."""
+        result = await run_git(
+            ["ls-remote", "--symref", "--", url, "HEAD"], cwd, env=env, time_limit=time_limit
+        )
+        if result.code != 0:
+            raise GitError(f"git ls-remote failed: {result.stderr.strip()}")
+        for line in result.stdout.splitlines():
+            if line.startswith("ref: refs/heads/"):
+                return line.removeprefix("ref: refs/heads/").split("\t", 1)[0]
+        return None
+
+    # ------------------------------------------------------------- remotes
+
+    async def remote_url(self) -> str | None:
+        out = await self._run("remote", "get-url", "origin", check=False)
+        return out.strip() or None
+
+    async def set_remote(self, url: str) -> None:
+        if await self.remote_url() is None:
+            await self._run("remote", "add", "origin", url)
+        else:
+            await self._run("remote", "set-url", "origin", url)
+
+    async def remove_remote(self) -> None:
+        await self._run("remote", "remove", "origin", check=False)
+
+    async def current_branch(self) -> str:
+        out = await self._run("symbolic-ref", "--short", "-q", "HEAD", check=False)
+        return out.strip() or "main"
+
+    async def fetch(self, *, env: dict[str, str], time_limit: float) -> None:
+        await self._run("fetch", "-q", "origin", env=env, time_limit=time_limit)
+
+    async def push(
+        self, branch: str, *, ref: str = "HEAD", env: dict[str, str], time_limit: float
+    ) -> None:
+        result = await run_git(
+            ["push", "-q", "origin", f"{ref}:refs/heads/{branch}"],
+            self.path,
+            env=env,
+            time_limit=time_limit,
+        )
+        if result.code == 0:
+            return
+        message = result.stderr.strip()
+        if _REJECTED.search(message):
+            raise PushRejected("The remote has commits this ledger does not have yet")
+        log.error("git push failed in %s: %s", self.path, message)
+        raise GitError(f"git push failed: {message}")
+
+    async def remote_branch_exists(self, branch: str) -> bool:
+        out = await self._run(
+            "rev-parse", "--verify", "-q", f"refs/remotes/origin/{branch}", check=False
+        )
+        return bool(out.strip())
+
+    async def ahead_behind(self, branch: str) -> tuple[int, int]:
+        """(commits only here, commits only on origin/<branch>)."""
+        out = await self._run(
+            "rev-list", "--left-right", "--count", f"HEAD...refs/remotes/origin/{branch}"
+        )
+        ahead, behind = out.split()
+        return int(ahead), int(behind)
+
+    async def fast_forward(self, branch: str) -> None:
+        await self._run("merge", "-q", "--ff-only", f"refs/remotes/origin/{branch}")
+
+    async def reset_to_remote(self, branch: str) -> None:
+        """Make the working tree and HEAD identical to origin/<branch>, dropping local commits."""
+        await self._run("reset", "-q", "--hard", f"refs/remotes/origin/{branch}")
+
+    async def remote_sha(self, branch: str) -> str:
+        return (await self._run("rev-parse", f"refs/remotes/origin/{branch}")).strip()
+
+    async def force_push(
+        self, branch: str, *, expected_remote: str, env: dict[str, str], time_limit: float
+    ) -> None:
+        """Overwrite origin/<branch> with HEAD, but only if it still is what we last fetched."""
+        await self._run(
+            "push",
+            "-q",
+            f"--force-with-lease=refs/heads/{branch}:{expected_remote}",
+            "origin",
+            f"HEAD:refs/heads/{branch}",
+            env=env,
+            time_limit=time_limit,
+        )
+
+    async def rebase_onto_remote(self, branch: str, committer: Author) -> list[str] | None:
+        """Replay local commits on top of origin/<branch>. Returns the conflicting files on failure
+        (the rebase is aborted and the tree left as it was), or None on success."""
+        result = await run_git(
+            [*self._author_env_args(committer), "rebase", "-q", f"refs/remotes/origin/{branch}"],
+            self.path,
+        )
+        if result.code == 0:
+            return None
+        await self._run("rebase", "--abort", check=False)
+        files = sorted(set(_CONFLICT_FILE.findall(result.stdout + "\n" + result.stderr)))
+        log.warning("rebase in %s conflicted in %s", self.path, files or "unknown files")
+        return files or ["(see git for details)"]
 
     def _author_env_args(self, author: Author) -> list[str]:
         return [

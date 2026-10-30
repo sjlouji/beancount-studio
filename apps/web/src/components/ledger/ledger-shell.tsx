@@ -1,110 +1,148 @@
 "use client";
 
-import { PlusIcon, SearchIcon, SparklesIcon } from "lucide-react";
+import { BookOpenIcon, DownloadIcon, HouseIcon, LayoutDashboardIcon, MenuIcon, MoreHorizontalIcon, PlusIcon, SearchIcon, SettingsIcon, SparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type CSSProperties, type ReactNode } from "react";
-import { Brand } from "@/components/app/brand";
+import { useState, type ReactNode } from "react";
+import { AppFrame } from "@/components/app/app-frame";
+import type { RailSection } from "@/components/app/rail";
 import { CommandPalette, useCommandPalette } from "@/components/app/command-palette";
-import { ThemeToggle } from "@/components/app/theme-toggle";
-import { UserMenu } from "@/components/app/user-menu";
+import { ContentHeader, type HeaderTab } from "@/components/app/content-header";
+import { useFrameState } from "@/components/app/frame-state";
+import { LedgerTile } from "@/components/app/sidebar-parts";
+import { REMOTE_STATE_LABELS, RemoteStateBadge } from "@/components/data/settings-remote";
 import { Button } from "@/components/ui/button";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import type { Ledger } from "@/lib/api/types";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { Ledger, LedgerRemote } from "@/lib/api/types";
+import { formatRelative } from "@/lib/format";
+import { AskPanel } from "./ask-panel";
 import { FilterBar } from "./filter-bar";
 import { LedgerProvider, useLedgerContext } from "./ledger-context";
+import { LEDGER_SECTIONS, navItemIsActive, sectionForPath, visibleItems } from "./ledger-nav";
 import { LedgerSidebar } from "./ledger-sidebar";
 import { NewEntryDialog } from "./new-entry-dialog";
 
 const NO_FILTER_PATHS = ["/files", "/commits", "/settings", "/ask", "/import", "/receipt", "/entry", "/query"];
 const NO_INTERVAL_PATHS = ["/journal", "/accounts", "/commodities", "/documents", "/events", "/errors", "/budget", "/holdings", "/statistics"];
 
-/** Height of the aubergine top bar; the fixed sidebar is offset below it through `--sidebar-top`. */
-const TOP_BAR_HEIGHT = "3rem";
-
-/** The Slack-style frame: a full-width aubergine bar with the search pill in the middle. */
-function TopBar() {
-  const { base, canWrite, ledger } = useLedgerContext();
-  const palette = useCommandPalette();
-  const [adding, setAdding] = useState(false);
-
+/** Push state of the ledger's remote; opens the Remote card in settings. */
+function RemoteStatus({ remote, base }: { remote: LedgerRemote; base: string }) {
+  const detail = remote.lastError || (remote.lastSyncedAt ? `Last synced ${formatRelative(remote.lastSyncedAt)}` : "Not synced yet");
   return (
-    <div className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 bg-sidebar px-3 text-sidebar-foreground md:px-4">
-      <Brand tone="onAubergine" compact className="md:hidden" />
-      <Brand tone="onAubergine" className="hidden md:flex" />
-      <button
-        type="button"
-        onClick={palette.open}
-        className="mx-auto flex h-8 w-full max-w-xl items-center gap-2 rounded-full bg-sidebar-accent px-3 text-sm text-sidebar-foreground/85 transition-colors outline-none hover:bg-sidebar-accent/80 focus-visible:ring-3 focus-visible:ring-sidebar-ring/50"
-        aria-label="Search and jump"
-      >
-        <SearchIcon className="size-4 shrink-0" />
-        <span className="truncate">Search {ledger.title}</span>
-        <span className="ml-auto hidden font-mono text-xs text-sidebar-muted sm:inline">⌘K</span>
-      </button>
-      <div className="flex shrink-0 items-center gap-1">
-        {canWrite && (
-          <Button size="sm" variant="outline-on-aubergine" className="hidden sm:inline-flex" onClick={() => setAdding(true)}>
-            <PlusIcon data-icon="inline-start" /> New entry
-          </Button>
-        )}
-        <Button asChild size="sm" variant="ghost-on-aubergine">
-          <Link href={`${base}/ask`}>
-            <SparklesIcon data-icon="inline-start" /> Ask
-          </Link>
-        </Button>
-        <ThemeToggle tone="onAubergine" />
-        <UserMenu tone="onAubergine" />
-      </div>
-      <CommandPalette />
-      {canWrite && <NewEntryDialog open={adding} onOpenChange={setAdding} />}
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link href={`${base}/settings`} className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/40" aria-label={`Remote ${REMOTE_STATE_LABELS[remote.state].toLowerCase()}. ${detail}`}>
+          <RemoteStateBadge state={remote.state} />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent>{detail}</TooltipContent>
+    </Tooltip>
   );
 }
 
-/** Slim toolbar at the top of the content pane: sidebar toggle plus the shared filters. */
-function Toolbar() {
-  const { base, ledger } = useLedgerContext();
+/** The channel-style header: ledger title, sync state, actions, the section's tabs and the filters. */
+function Header() {
+  const { base, ledger, canWrite, queryString } = useLedgerContext();
+  const palette = useCommandPalette();
+  const [adding, setAdding] = useState(false);
   const pathname = usePathname();
   const rel = pathname.slice(base.length) || "/";
   const showFilters = !NO_FILTER_PATHS.some((p) => rel === p || rel.startsWith(`${p}/`));
   const showInterval = !NO_INTERVAL_PATHS.some((p) => rel === p || rel.startsWith(`${p}/`));
+  const section = sectionForPath(base, pathname);
+  const tabs: HeaderTab[] = (section ? visibleItems(section, ledger.canWrite) : []).map((item) => ({ label: item.label, href: `${base}${item.path}${queryString}`, active: navItemIsActive(item, base, pathname) }));
 
   return (
-    <div className="sticky top-12 z-20 flex min-h-11 flex-wrap items-center gap-2 border-b bg-background/90 px-3 py-1.5 backdrop-blur md:rounded-t-lg md:px-4">
-      <SidebarTrigger className="-ml-1" />
-      {showFilters ? (
-        <FilterBar showInterval={showInterval} />
-      ) : (
-        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-          <Link href="/ledgers" className="hover:text-foreground">
-            Ledgers
-          </Link>
-          <span>/</span>
-          <Link href={base} className="truncate font-semibold text-foreground">
-            {ledger.title}
-          </Link>
-        </nav>
-      )}
-    </div>
+    <>
+      <ContentHeader
+        leading={<LedgerTile title={ledger.title} className="size-7 rounded-[7px] text-[13px]" />}
+        title={ledger.title}
+        subtitle={ledger.description || `${ledger.owner}/${ledger.slug}`}
+        actions={
+          <>
+            {ledger.remote && <RemoteStatus remote={ledger.remote} base={base} />}
+            {canWrite && (
+              <Button size="sm" variant="secondary" className="max-sm:size-7 max-sm:rounded-md max-sm:px-0" aria-label="New entry" onClick={() => setAdding(true)}>
+                <PlusIcon />
+                <span className="max-sm:sr-only">New entry</span>
+              </Button>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label="Search this ledger" onClick={palette.open}>
+                  <SearchIcon />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Search (⌘K)</TooltipContent>
+            </Tooltip>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label="More">
+                  <MoreHorizontalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <a href={`/api/ledgers/${ledger.owner}/${ledger.slug}/archive`}>
+                    <DownloadIcon /> Download archive
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`${base}/settings`}>
+                    <SettingsIcon /> Ledger settings
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+        tabs={tabs}
+        toolbar={showFilters ? <FilterBar showInterval={showInterval} /> : undefined}
+      />
+      {canWrite && <NewEntryDialog open={adding} onOpenChange={setAdding} />}
+    </>
+  );
+}
+
+function Shell({ children }: { children: ReactNode }) {
+  const { ledger, base, queryString, ask, openAsk } = useLedgerContext();
+  const palette = useCommandPalette();
+  const { setMobileSidebarOpen } = useFrameState();
+  const pathname = usePathname();
+  const current = sectionForPath(base, pathname);
+  // Detail pages (an account, an entry, the full assistant) belong to no section; the sidebar then lists the ledger's own pages.
+  const sidebarSection = current ?? LEDGER_SECTIONS[0]!;
+  const railSections: RailSection[] = LEDGER_SECTIONS.flatMap((section) => {
+    const [first] = visibleItems(section, ledger.canWrite);
+    return first ? [{ id: section.id, label: section.label, icon: section.icon, href: `${base}${first.path}${queryString}`, active: section.id === current?.id }] : [];
+  });
+  return (
+    <AppFrame
+      sidebar={<LedgerSidebar section={sidebarSection} onSearch={palette.open} />}
+      header={<Header />}
+      aside={<AskPanel />}
+      searchLabel={`Search ${ledger.title}`}
+      onSearch={palette.open}
+      railExtra={{ sections: railSections, onAsk: () => openAsk(), askActive: ask.open }}
+      mobileTabs={[
+        { label: "Home", icon: HouseIcon, href: "/ledgers" },
+        { label: "Overview", icon: LayoutDashboardIcon, href: base, active: pathname === base },
+        { label: "Journal", icon: BookOpenIcon, href: `${base}/journal`, active: pathname.startsWith(`${base}/journal`) },
+        { label: "Ask", icon: SparklesIcon, onClick: () => openAsk(), active: ask.open },
+        { label: "Menu", icon: MenuIcon, onClick: () => setMobileSidebarOpen(true) },
+      ]}
+    >
+      {children}
+      <CommandPalette />
+    </AppFrame>
   );
 }
 
 export function LedgerShell({ owner, slug, ledger, children }: { owner: string; slug: string; ledger: Ledger; children: ReactNode }) {
   return (
     <LedgerProvider owner={owner} slug={slug} ledger={ledger}>
-      <div className="flex min-h-dvh flex-col bg-sidebar">
-        <TopBar />
-        <SidebarProvider className="min-h-0 flex-1" style={{ "--sidebar-top": TOP_BAR_HEIGHT } as CSSProperties}>
-          <LedgerSidebar />
-          <SidebarInset className="min-w-0">
-            <Toolbar />
-            <div className="flex-1 px-4 py-6 md:px-8 md:py-8">
-              <div className="mx-auto w-full max-w-7xl">{children}</div>
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
-      </div>
+      <Shell>{children}</Shell>
     </LedgerProvider>
   );
 }

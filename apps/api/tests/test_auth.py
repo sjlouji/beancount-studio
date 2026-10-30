@@ -66,3 +66,25 @@ async def test_system_info(client: AsyncClient):
     res = await client.get("/api/system/info")
     assert res.status_code == 200
     assert res.json()["aiEnabled"] is False
+
+
+async def test_stale_session_cookie_is_cleared_by_the_error_response(client: AsyncClient):
+    stale = {"cookie": "bs_session=left-over-from-a-reset-database"}
+    res = await client.get("/api/auth/me", headers=stale)
+    assert res.status_code == 401
+    cleared = [c for c in res.headers.get_list("set-cookie") if c.startswith("bs_session=")]
+    assert cleared and "Max-Age=0" in cleared[0], res.headers
+
+    public = await client.get("/api/system/info", headers=stale)
+    assert public.status_code == 200
+    assert "set-cookie" not in public.headers, "only error responses clear the cookie"
+
+
+async def test_wrong_current_password_keeps_the_session_cookie(client: AsyncClient, user: dict):
+    res = await client.post(
+        "/api/auth/change-password",
+        json={"currentPassword": "not-the-password", "newPassword": "another-correct-horse"},
+    )
+    assert res.status_code == 401
+    assert "set-cookie" not in res.headers
+    assert (await client.get("/api/auth/me")).status_code == 200

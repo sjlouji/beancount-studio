@@ -1,8 +1,8 @@
 import * as React from "react"
 import { cn } from "cn"
 
-// DESIGN.md cards: 16px radius, hairline border, flat (level 0). `cream` is {card-feature-cream},
-// `aubergine` is {card-aubergine-band}; both drop the hairline.
+// DESIGN.md cards: 12px radius, hairline border, flat. `muted` is the grouped-grey inset card,
+// `accent` the one filled accent band a view may carry.
 function Card({
   className,
   size = "default",
@@ -10,7 +10,7 @@ function Card({
   ...props
 }: React.ComponentProps<"div"> & {
   size?: "default" | "sm"
-  variant?: "default" | "cream" | "aubergine"
+  variant?: "default" | "muted" | "accent"
 }) {
   return (
     <div
@@ -19,9 +19,9 @@ function Card({
       data-variant={variant}
       className={cn(
         "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl border border-border bg-card py-(--card-spacing) text-sm text-card-foreground [--card-spacing:--spacing(5)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
-        variant === "cream" && "border-transparent bg-canvas-cream text-foreground",
-        variant === "aubergine" &&
-          "border-transparent bg-primary text-primary-foreground [--card-spacing:--spacing(8)] **:data-[slot=card-description]:text-sidebar-muted",
+        variant === "muted" && "border-transparent bg-muted text-foreground",
+        variant === "accent" &&
+          "border-transparent bg-primary text-primary-foreground [--card-spacing:--spacing(8)] **:data-[slot=card-description]:text-primary-foreground/80",
         className
       )}
       {...props}
@@ -47,7 +47,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "text-base leading-snug font-semibold group-data-[size=sm]/card:text-sm",
+        "type-headline group-data-[size=sm]/card:text-sm",
         className
       )}
       {...props}
@@ -59,7 +59,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn("type-subhead text-muted-foreground", className)}
       {...props}
     />
   )
@@ -93,7 +93,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)",
+        "flex items-center rounded-b-xl border-t p-(--card-spacing)",
         className
       )}
       {...props}
