@@ -14,8 +14,10 @@ import { REMOTE_STATE_LABELS, RemoteStateBadge } from "@/components/data/setting
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ledgerPath } from "@/lib/api/hooks";
 import type { Ledger, LedgerRemote } from "@/lib/api/types";
 import { formatRelative } from "@/lib/format";
+import { workspaceHref } from "@/lib/routes";
 import { AskPanel } from "./ask-panel";
 import { FilterBar } from "./filter-bar";
 import { LedgerProvider, useLedgerContext } from "./ledger-context";
@@ -58,7 +60,7 @@ function Header() {
       <ContentHeader
         leading={<LedgerTile title={ledger.title} className="size-7 rounded-[7px] text-[13px]" />}
         title={ledger.title}
-        subtitle={ledger.description || `${ledger.owner}/${ledger.slug}`}
+        subtitle={ledger.description || `${ledger.workspace}/${ledger.slug}`}
         actions={
           <>
             {ledger.remote && <RemoteStatus remote={ledger.remote} base={base} />}
@@ -84,7 +86,7 @@ function Header() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <a href={`/api/ledgers/${ledger.owner}/${ledger.slug}/archive`}>
+                  <a href={`/api${ledgerPath(ledger.workspace, ledger.slug)}/archive`}>
                     <DownloadIcon /> Download archive
                   </a>
                 </DropdownMenuItem>
@@ -126,7 +128,7 @@ function Shell({ children }: { children: ReactNode }) {
       onSearch={palette.open}
       railExtra={{ sections: railSections, onAsk: () => openAsk(), askActive: ask.open }}
       mobileTabs={[
-        { label: "Home", icon: HouseIcon, href: "/ledgers" },
+        { label: "Home", icon: HouseIcon, href: workspaceHref(ledger.workspace) },
         { label: "Overview", icon: LayoutDashboardIcon, href: base, active: pathname === base },
         { label: "Journal", icon: BookOpenIcon, href: `${base}/journal`, active: pathname.startsWith(`${base}/journal`) },
         { label: "Ask", icon: SparklesIcon, onClick: () => openAsk(), active: ask.open },
@@ -139,9 +141,9 @@ function Shell({ children }: { children: ReactNode }) {
   );
 }
 
-export function LedgerShell({ owner, slug, ledger, children }: { owner: string; slug: string; ledger: Ledger; children: ReactNode }) {
+export function LedgerShell({ workspace, slug, ledger, children }: { workspace: string; slug: string; ledger: Ledger; children: ReactNode }) {
   return (
-    <LedgerProvider owner={owner} slug={slug} ledger={ledger}>
+    <LedgerProvider workspace={workspace} slug={slug} ledger={ledger}>
       <Shell>{children}</Shell>
     </LedgerProvider>
   );

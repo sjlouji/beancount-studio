@@ -274,11 +274,17 @@ class RemoteSync:
         return self._decrypt(row.private_key_ciphertext)
 
     async def _credentials(
-        self, db: AsyncSession, remote: LedgerRemote, owner_id: str
+        self, db: AsyncSession, remote: LedgerRemote
     ) -> tuple[str | None, str | None]:
-        """(token, private key) for a stored remote; pushes use the ledger owner's SSH key."""
+        """(token, private key) for a stored remote; SSH uses the key of whoever connected it."""
         token = self._decrypt(remote.token_ciphertext) if remote.token_ciphertext else None
-        key = await self._user_private_key(db, owner_id) if remote.auth == "ssh_key" else None
+        key = None
+        if remote.auth == "ssh_key":
+            if remote.ssh_user_id is None:
+                raise ValidationError(
+                    "The account whose SSH key pushed this remote is gone; reconnect the remote"
+                )
+            key = await self._user_private_key(db, remote.ssh_user_id)
         return token, key
 
     # -------------------------------------------------------------- operations
@@ -289,19 +295,12 @@ class RemoteSync:
         source: Source,
         auth: str,
         token: str | None = None,
-        *,
-        key_owner_id: str | None = None,
     ) -> str | None:
-        """Reach the remote with these credentials; returns its default branch, None if empty.
-
-        `user` is who is asking (policy); the SSH key is `key_owner_id`'s, by default theirs.
-        """
+        """Reach the remote with these credentials; returns its default branch, None if empty."""
         self.check_source(source, auth, user)
         if source.transport == "local":
             await self._check_local_repo(source)
-        key = (
-            await self._user_private_key(db, key_owner_id or user.id) if auth == "ssh_key" else None
-        )
+        key = await self._user_private_key(db, user.id) if auth == "ssh_key" else None
         async with self._git_env(auth, token=token, private_key=key) as env:
             return await GitRepo.default_branch(
                 source.url, env=env, time_limit=NETWORK_TIMEOUT, cwd=self.storage.tmp_dir
@@ -325,7 +324,7 @@ class RemoteSync:
         if source.transport == "local":
             await self._check_local_repo(source)
         key = await self._user_private_key(db, user.id) if auth == "ssh_key" else None
-        paths = self.store.paths(ledger.id)
+        paths = self.store.paths(ledger)
         if paths.repo.exists():
             raise LedgerError("Ledger directory already exists")
         try:
@@ -349,6 +348,7 @@ class RemoteSync:
             transport=source.transport,
             auth=auth,
             token_ciphertext=self._encrypt(token) if auth == "token" and token else None,
+            ssh_user_id=user.id if auth == "ssh_key" else None,
             branch=branch,
             state="in_sync",
             last_pushed_sha=head,
@@ -368,17 +368,10 @@ class RemoteSync:
     ) -> LedgerRemote:
         """Point an existing ledger at a remote and push its history there.
 
-        `user` is the person connecting (policy checks); SSH pushes always use the owner's key,
-        so only the owner may connect one.
+        `user` is the person connecting; an SSH remote pushes with their key from then on.
         """
-        if auth == "ssh_key" and user.id != ledger.owner_id:
-            raise ForbiddenError(
-                "Only the ledger's owner can connect an SSH remote; it pushes with their key"
-            )
-        repo = self.store.repo(ledger.id)
-        default_branch = await self.test(
-            db, user, source, auth, token, key_owner_id=ledger.owner_id
-        )
+        repo = self.store.repo(ledger)
+        default_branch = await self.test(db, user, source, auth, token)
         branch = default_branch or await repo.current_branch()
         async with self._op_lock(ledger.id):
             await repo.set_remote(source.url)
@@ -390,6 +383,7 @@ class RemoteSync:
             remote.transport = source.transport
             remote.auth = auth
             remote.token_ciphertext = self._encrypt(token) if auth == "token" and token else None
+            remote.ssh_user_id = user.id if auth == "ssh_key" else None
             remote.branch = branch
             remote.state = "pushing"
             remote.last_pushed_sha = None
@@ -404,7 +398,7 @@ class RemoteSync:
 
     async def disconnect(self, db: AsyncSession, ledger: Ledger) -> None:
         async with self._op_lock(ledger.id):
-            await self.store.repo(ledger.id).remove_remote()
+            await self.store.repo(ledger).remove_remote()
             if ledger.remote is not None:
                 ledger.remote = None  # delete-orphan removes the row
                 await db.commit()
@@ -446,14 +440,14 @@ class RemoteSync:
                 return  # disconnected meanwhile
             if remote.state == "diverged":
                 return  # paused until the divergence is resolved
-            repo = self.store.repo(ledger.id)
+            repo = self.store.repo(ledger)
             head = await repo.head()
             if head is None or head == remote.last_pushed_sha:
                 return
             remote.state = "pushing"
             await db.commit()
             try:
-                token, key = await self._credentials(db, remote, ledger.owner_id)
+                token, key = await self._credentials(db, remote)
                 async with self._git_env(remote.auth, token=token, private_key=key) as env:
                     await repo.push(remote.branch, ref=head, env=env, time_limit=NETWORK_TIMEOUT)
             except PushRejected as exc:
@@ -482,13 +476,13 @@ class RemoteSync:
         # Network work happens outside the ledger's write lock; only integrating the remote
         # commits into the working tree takes it, so edits are not stalled by a slow host.
         async with self._op_lock(ledger.id):
-            repo = self.store.repo(ledger.id)
+            repo = self.store.repo(ledger)
             try:
-                token, key = await self._credentials(db, remote, ledger.owner_id)
+                token, key = await self._credentials(db, remote)
                 async with self._git_env(remote.auth, token=token, private_key=key) as env:
                     await repo.fetch(env=env, time_limit=NETWORK_TIMEOUT)
                     exists = await repo.remote_branch_exists(remote.branch)
-                    async with self.store.write_lock(ledger.id):
+                    async with self.store.write_lock(ledger):
                         ahead, behind = (
                             await repo.ahead_behind(remote.branch)
                             if exists
@@ -510,7 +504,7 @@ class RemoteSync:
                                     return remote
                             else:
                                 await repo.fast_forward(remote.branch)
-                            await self.store.reload(ledger.id)
+                            await self.store.reload(ledger)
                         head = await repo.head()
                     if head is not None and (ahead or not exists):
                         await repo.push(
@@ -543,15 +537,15 @@ class RemoteSync:
         if keep not in ("local", "remote"):
             raise ValidationError("Choose which version to keep: local or remote")
         async with self._op_lock(ledger.id):
-            repo = self.store.repo(ledger.id)
+            repo = self.store.repo(ledger)
             try:
-                token, key = await self._credentials(db, remote, ledger.owner_id)
+                token, key = await self._credentials(db, remote)
                 async with self._git_env(remote.auth, token=token, private_key=key) as env:
                     await repo.fetch(env=env, time_limit=NETWORK_TIMEOUT)
                     if keep == "remote":
-                        async with self.store.write_lock(ledger.id):
+                        async with self.store.write_lock(ledger):
                             await repo.reset_to_remote(remote.branch)
-                            await self.store.reload(ledger.id)
+                            await self.store.reload(ledger)
                     else:
                         await repo.force_push(
                             remote.branch,

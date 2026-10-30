@@ -54,11 +54,57 @@ export interface CommitDetails extends Commit {
   diff: string;
 }
 
+export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
+
+/** A workspace the person belongs to; mirrors WorkspaceOut in schemas.py. */
+export interface Workspace {
+  id: string;
+  slug: string;
+  name: string;
+  role: WorkspaceRole;
+  membersCount: number;
+  ledgersCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Member {
+  username: string;
+  displayName: string;
+  role: WorkspaceRole;
+  joinedAt: string;
+}
+
+/** An invite link; the link itself is only in the MintedInvite returned when it is created. */
+export interface Invite {
+  id: string;
+  role: WorkspaceRole;
+  uses: number;
+  createdBy: string | null;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface MintedInvite extends Invite {
+  url: string;
+}
+
+export interface InvitePreview {
+  workspaceSlug: string;
+  workspaceName: string;
+  role: WorkspaceRole;
+  invitedBy: string | null;
+  expiresAt: string;
+  alreadyMember: boolean;
+}
+
+/** What a workspace role amounts to inside a ledger: owners and admins administer, members write, viewers read. */
 export type LedgerRole = "owner" | "admin" | "write" | "read" | "public";
 
 export interface Ledger {
   id: string;
-  owner: string;
+  /** Slug of the workspace the ledger lives in. */
+  workspace: string;
   slug: string;
   title: string;
   description: string;
@@ -107,13 +153,6 @@ export interface SshKey {
   createdAt: string;
 }
 
-export interface Collaborator {
-  username: string;
-  displayName: string;
-  role: "read" | "write" | "admin";
-  createdAt: string;
-}
-
 export interface ApiKey {
   id: string;
   name: string;
@@ -131,7 +170,7 @@ export interface MintedApiKey extends ApiKey {
 }
 
 export interface ActivityItem extends Commit {
-  ledger: { owner: string; slug: string; title: string };
+  ledger: { workspace: string; slug: string; title: string };
 }
 
 export interface LedgerMeta {
@@ -558,7 +597,6 @@ export interface ThreadMessageLike {
 
 export interface PublicProfile {
   profile: { username: string; displayName: string; bio: string; website: string; location: string; createdAt: string };
-  ledgers: Array<{ owner: string; slug: string; title: string; description: string; visibility: string; starsCount: number; updatedAt: string }>;
   starredCount: number;
   isSelf: boolean;
 }

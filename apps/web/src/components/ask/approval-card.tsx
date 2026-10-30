@@ -61,14 +61,14 @@ function projectLocally(files: FileOperation[], current: Record<string, string |
 }
 
 export function ApprovalCard({ args, result, status, addResult }: ToolCallMessagePartProps<ApprovalArgs, ApprovalResult>) {
-  const { owner, slug } = useLedgerContext();
+  const { workspace, slug } = useLedgerContext();
   const [reason, setReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const files = Array.isArray(args.files) ? args.files : [];
   const argsReady = status.type !== "running" && files.length > 0;
 
   const preview = useQuery<Projection>({
-    queryKey: ["approval-preview", owner, slug, JSON.stringify(files)],
+    queryKey: ["approval-preview", workspace, slug, JSON.stringify(files)],
     enabled: argsReady,
     queryFn: async () => {
       const paths = Array.from(new Set(files.map((f) => f.path)));
@@ -76,7 +76,7 @@ export function ApprovalCard({ args, result, status, addResult }: ToolCallMessag
       await Promise.all(
         paths.map(async (path) => {
           try {
-            const res = await fetch(`/api${ledgerPath(owner, slug)}/files/content?path=${encodeURIComponent(path)}`);
+            const res = await fetch(`/api${ledgerPath(workspace, slug)}/files/content?path=${encodeURIComponent(path)}`);
             if (res.status === 404) {
               current[path] = null;
               return;
@@ -88,7 +88,7 @@ export function ApprovalCard({ args, result, status, addResult }: ToolCallMessag
           }
         }),
       );
-      return apiPost<Projection>(`${ledgerPath(owner, slug)}/files/check`, { changes: projectLocally(files, current) });
+      return apiPost<Projection>(`${ledgerPath(workspace, slug)}/files/check`, { changes: projectLocally(files, current) });
     },
   });
 

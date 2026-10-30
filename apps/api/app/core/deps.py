@@ -1,4 +1,8 @@
-"""FastAPI dependencies: authentication (session cookie or API key) and ledger access."""
+"""FastAPI dependencies: authentication (session cookie or API key), workspace and ledger access.
+
+A person's role in a workspace decides what they may do with every ledger in it: owners and
+admins administer, members write, viewers read. Public ledgers are readable by anyone.
+"""
 
 from __future__ import annotations
 
@@ -13,11 +17,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings, get_settings
 from app.core.security import hash_token
 from app.db.base import get_db
-from app.db.models import ApiKey, Ledger, LedgerCollaborator, Session, User, utcnow
+from app.db.models import ApiKey, Ledger, Session, User, Workspace, WorkspaceMember, utcnow
 from app.errors import ForbiddenError, NotFoundError, UnauthorizedError
 
 Role = Literal["owner", "admin", "write", "read", "public"]
 _ROLE_RANK: dict[str, int] = {"public": 0, "read": 1, "write": 2, "admin": 3, "owner": 4}
+
+WorkspaceRole = Literal["owner", "admin", "member", "viewer"]
+WORKSPACE_ROLE_RANK: dict[str, int] = {"viewer": 1, "member": 2, "admin": 3, "owner": 4}
+# What a workspace role amounts to inside each of its ledgers.
+LEDGER_ROLE_FOR: dict[str, Role] = {
+    "owner": "owner",
+    "admin": "admin",
+    "member": "write",
+    "viewer": "read",
+}
 
 
 @dataclass
@@ -49,6 +63,34 @@ class LedgerAccess:
     @property
     def can_admin(self) -> bool:
         return _ROLE_RANK[self.role] >= _ROLE_RANK["admin"] and self.auth.can_write_scope
+
+    @property
+    def is_owner(self) -> bool:
+        return self.role == "owner"
+
+
+@dataclass
+class WorkspaceAccess:
+    workspace: Workspace
+    role: WorkspaceRole
+    auth: AuthContext
+
+    @property
+    def user(self) -> User:
+        assert self.auth.user is not None  # membership implies a signed-in person
+        return self.auth.user
+
+    @property
+    def rank(self) -> int:
+        return WORKSPACE_ROLE_RANK[self.role]
+
+    @property
+    def can_write(self) -> bool:
+        return self.rank >= WORKSPACE_ROLE_RANK["member"] and self.auth.can_write_scope
+
+    @property
+    def can_admin(self) -> bool:
+        return self.rank >= WORKSPACE_ROLE_RANK["admin"] and self.auth.can_write_scope
 
     @property
     def is_owner(self) -> bool:
@@ -158,11 +200,55 @@ async def require_session_user(auth: AuthDep) -> User:
 SessionUserDep = Annotated[User, Depends(require_session_user)]
 
 
-async def find_ledger(db: AsyncSession, owner: str, slug: str) -> Ledger | None:
+async def find_workspace(db: AsyncSession, slug: str) -> Workspace | None:
+    return (await db.execute(select(Workspace).where(Workspace.slug == slug))).scalar_one_or_none()
+
+
+async def find_membership(
+    db: AsyncSession, workspace_id: str, user_id: str
+) -> WorkspaceMember | None:
+    return await db.get(WorkspaceMember, {"workspace_id": workspace_id, "user_id": user_id})
+
+
+async def get_workspace_access(workspace: str, db: DbDep, auth: AuthDep) -> WorkspaceAccess:
+    """Members only. A workspace that exists but does not include the caller reads as missing."""
+    if auth.user is None:
+        raise UnauthorizedError("Sign in to use this workspace")
+    if auth.kind == "api_key" and auth.api_key_ledger_id:
+        raise ForbiddenError("This API key is limited to one ledger")
+    row = await find_workspace(db, workspace)
+    if row is None:
+        raise NotFoundError("Workspace not found")
+    member = await find_membership(db, row.id, auth.user.id)
+    if member is None:
+        raise NotFoundError("Workspace not found")
+    return WorkspaceAccess(workspace=row, role=member.role, auth=auth)  # type: ignore[arg-type]
+
+
+WorkspaceDep = Annotated[WorkspaceAccess, Depends(get_workspace_access)]
+
+
+async def require_workspace_admin(access: WorkspaceDep) -> WorkspaceAccess:
+    if not access.can_admin:
+        raise ForbiddenError("You need admin access to this workspace")
+    return access
+
+
+async def require_workspace_owner(access: WorkspaceDep) -> WorkspaceAccess:
+    if not access.is_owner or access.auth.kind != "session":
+        raise ForbiddenError("Only an owner can do this, from a signed-in session")
+    return access
+
+
+WorkspaceAdminDep = Annotated[WorkspaceAccess, Depends(require_workspace_admin)]
+WorkspaceOwnerDep = Annotated[WorkspaceAccess, Depends(require_workspace_owner)]
+
+
+async def find_ledger(db: AsyncSession, workspace: str, slug: str) -> Ledger | None:
     stmt = (
         select(Ledger)
-        .join(User, User.id == Ledger.owner_id)
-        .where(User.username == owner, Ledger.slug == slug)
+        .join(Workspace, Workspace.id == Ledger.workspace_id)
+        .where(Workspace.slug == workspace, Ledger.slug == slug)
     )
     return (await db.execute(stmt)).scalar_one_or_none()
 
@@ -173,18 +259,16 @@ async def resolve_role(db: AsyncSession, ledger: Ledger, auth: AuthContext) -> R
     if auth.kind == "api_key" and auth.api_key_ledger_id and auth.api_key_ledger_id != ledger.id:
         return "public" if ledger.visibility == "public" else None
     if user is not None:
-        if ledger.owner_id == user.id:
-            return "owner"
-        collab = await db.get(LedgerCollaborator, {"ledger_id": ledger.id, "user_id": user.id})
-        if collab is not None:
-            return collab.role  # type: ignore[return-value]
+        member = await find_membership(db, ledger.workspace_id, user.id)
+        if member is not None:
+            return LEDGER_ROLE_FOR[member.role]
     if ledger.visibility == "public":
         return "public"
     return None
 
 
-async def get_ledger_access(owner: str, slug: str, db: DbDep, auth: AuthDep) -> LedgerAccess:
-    ledger = await find_ledger(db, owner, slug)
+async def get_ledger_access(workspace: str, slug: str, db: DbDep, auth: AuthDep) -> LedgerAccess:
+    ledger = await find_ledger(db, workspace, slug)
     if ledger is None:
         raise NotFoundError("Ledger not found")
     role = await resolve_role(db, ledger, auth)

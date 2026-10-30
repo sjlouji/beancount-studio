@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { EMPTY_SOURCE, RemoteSourceFields, sourceIsComplete, type RemoteSource } from "@/components/data/settings-remote";
@@ -17,12 +17,14 @@ import {
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { apiPost, errorMessage, isApiError } from "@/lib/api/client";
-import { keys } from "@/lib/api/hooks";
-import type { Ledger } from "@/lib/api/types";
+import { keys, useCreateWorkspace, useWorkspaces, workspacePath } from "@/lib/api/hooks";
+import type { Ledger, Workspace } from "@/lib/api/types";
+import { ledgerHref } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 const TEMPLATES = [
@@ -36,16 +38,26 @@ type Mode = "fresh" | "repository";
 export function NewLedgerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const router = useRouter();
   const qc = useQueryClient();
+  // Inside a ledger the route names the current workspace; the picker starts there.
+  const route = useParams<{ workspace?: string }>();
+  const workspaces = useWorkspaces(open);
+  const createWorkspace = useCreateWorkspace();
   const [pending, setPending] = useState(false);
   const [mode, setMode] = useState<Mode>("fresh");
   const [template, setTemplate] = useState<(typeof TEMPLATES)[number]["id"]>("starter");
   const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [source, setSource] = useState<RemoteSource>(EMPTY_SOURCE);
+  const [chosenWorkspace, setChosenWorkspace] = useState("");
   // Set when the repository has several ledger files at its top level and the API asked which one.
   const [candidates, setCandidates] = useState<string[]>([]);
   const [mainFile, setMainFile] = useState("");
 
+  // Viewers cannot create ledgers, so they are not offered.
+  const writable = (workspaces.data ?? []).filter((w) => w.role !== "viewer");
+  const needsWorkspace = workspaces.isSuccess && writable.length === 0;
+  const workspace = chosenWorkspace || (writable.some((w) => w.slug === route.workspace) ? route.workspace : writable[0]?.slug) || "";
   const repositoryReady = sourceIsComplete(source) && (candidates.length === 0 || mainFile !== "");
+  const workspaceReady = needsWorkspace || workspace !== "";
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,11 +69,20 @@ export function NewLedgerDialog({ open, onOpenChange }: { open: boolean; onOpenC
         : { ...common, source: { url: source.url.trim(), auth: source.auth, token: source.auth === "token" ? source.token : undefined, mainFile: mainFile || undefined } };
     setPending(true);
     try {
-      const ledger = await apiPost<Ledger>("/ledgers", body);
-      await qc.invalidateQueries({ queryKey: keys.ledgers });
+      let target = workspace;
+      if (needsWorkspace) {
+        const created: Workspace = await createWorkspace.mutateAsync({ name: String(form.get("workspaceName") || "").trim() });
+        target = created.slug;
+      }
+      const ledger = await apiPost<Ledger>(`${workspacePath(target)}/ledgers`, body);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: keys.ledgers }),
+        qc.invalidateQueries({ queryKey: keys.workspaces }),
+        qc.invalidateQueries({ queryKey: keys.workspaceScope(target) }),
+      ]);
       toast.success(mode === "fresh" ? `Created ${ledger.title}` : `Imported ${ledger.title}`);
       onOpenChange(false);
-      router.push(`/ledger/${ledger.owner}/${ledger.slug}`);
+      router.push(ledgerHref(ledger.workspace, ledger.slug));
     } catch (err) {
       if (isApiError(err) && err.code === "main_file_required") {
         const found = err.details.candidates;
@@ -81,7 +102,7 @@ export function NewLedgerDialog({ open, onOpenChange }: { open: boolean; onOpenC
         <form onSubmit={onSubmit}>
           <DialogHeader>
             <DialogTitle className="type-title-2">New ledger</DialogTitle>
-            <DialogDescription>A ledger is a git repository of plain-text Beancount files.</DialogDescription>
+            <DialogDescription>A ledger is a git repository of plain-text Beancount files, shared with everyone in its workspace.</DialogDescription>
           </DialogHeader>
           <Tabs value={mode} onValueChange={(value) => setMode(value as Mode)} className="my-6 gap-6">
             <TabsList className="w-full">
@@ -89,6 +110,32 @@ export function NewLedgerDialog({ open, onOpenChange }: { open: boolean; onOpenC
               <TabsTrigger value="repository">From a repository</TabsTrigger>
             </TabsList>
             <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="ledger-workspace">Workspace</FieldLabel>
+                {workspaces.isPending ? (
+                  <Skeleton className="h-9 w-full" />
+                ) : workspaces.isError ? (
+                  <p className="text-sm text-negative">{errorMessage(workspaces.error, "Couldn't load your workspaces")}</p>
+                ) : needsWorkspace ? (
+                  <>
+                    <Input id="ledger-workspace" name="workspaceName" required placeholder="Acme Books" maxLength={120} />
+                    <FieldDescription>You are not in a workspace yet. Name one and this ledger will be its first.</FieldDescription>
+                  </>
+                ) : (
+                  <Select value={workspace} onValueChange={setChosenWorkspace}>
+                    <SelectTrigger id="ledger-workspace" className="w-full">
+                      <SelectValue placeholder="Choose a workspace" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {writable.map((item) => (
+                        <SelectItem key={item.id} value={item.slug}>
+                          {item.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </Field>
               <Field>
                 <FieldLabel htmlFor="ledger-title">Title</FieldLabel>
                 <Input id="ledger-title" name="title" required autoFocus placeholder="Personal finances" maxLength={160} />
@@ -165,7 +212,7 @@ export function NewLedgerDialog({ open, onOpenChange }: { open: boolean; onOpenC
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending || (mode === "repository" && !repositoryReady)}>
+            <Button type="submit" disabled={pending || !workspaceReady || (mode === "repository" && !repositoryReady)}>
               {pending && <Spinner className="size-4" data-icon="inline-start" />}
               {mode === "fresh" ? "Create ledger" : "Import repository"}
             </Button>

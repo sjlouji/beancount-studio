@@ -27,7 +27,7 @@ import {
 
 export interface LedgerNavItem {
   label: string;
-  /** Path under `/ledger/<owner>/<slug>`; "" is the overview. */
+  /** Path under `/w/<workspace>/<slug>`; "" is the overview. */
   path: string;
   icon: LucideIcon;
   exact?: boolean;

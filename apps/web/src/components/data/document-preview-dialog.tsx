@@ -9,8 +9,8 @@ const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "a
 
 export type PreviewKind = "image" | "pdf" | "none";
 
-export function documentRawUrl(owner: string, slug: string, documentPath: string): string {
-  return `/api${ledgerPath(owner, slug)}/files/raw?path=${encodeURIComponent(documentPath)}`;
+export function documentRawUrl(workspace: string, slug: string, documentPath: string): string {
+  return `/api${ledgerPath(workspace, slug)}/files/raw?path=${encodeURIComponent(documentPath)}`;
 }
 
 export function previewKind(path: string): PreviewKind {
@@ -20,8 +20,8 @@ export function previewKind(path: string): PreviewKind {
 }
 
 /** Inline preview for image and PDF documents, served from the ledger's raw-file endpoint. */
-export function DocumentPreviewDialog({ owner, slug, documentPath, onOpenChange }: { owner: string; slug: string; documentPath: string | null; onOpenChange: (open: boolean) => void }) {
-  const url = documentPath ? documentRawUrl(owner, slug, documentPath) : "";
+export function DocumentPreviewDialog({ workspace, slug, documentPath, onOpenChange }: { workspace: string; slug: string; documentPath: string | null; onOpenChange: (open: boolean) => void }) {
+  const url = documentPath ? documentRawUrl(workspace, slug, documentPath) : "";
   const kind = documentPath ? previewKind(documentPath) : "none";
   return (
     <Dialog open={Boolean(documentPath)} onOpenChange={onOpenChange}>

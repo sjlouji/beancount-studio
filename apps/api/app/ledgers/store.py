@@ -13,10 +13,10 @@ import hashlib
 import shutil
 import tempfile
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from beancount import loader as beancount_loader
 from fava.core import FavaLedger
@@ -95,6 +95,14 @@ def is_text_path(path: Path) -> bool:
     return path.suffix.lower() in _TEXT_EXTENSIONS
 
 
+class LedgerRef(Protocol):
+    """What the store needs to know about a ledger; the database row satisfies it."""
+
+    id: str
+    workspace_id: str
+    main_file: str
+
+
 class _LedgerHandle:
     def __init__(self, paths: LedgerPaths) -> None:
         self.paths = paths
@@ -121,22 +129,21 @@ class LedgerStore:
         self.commit_listeners: list[Callable[[str], None]] = []
 
     # ------------------------------------------------------------------ paths
-    def paths(self, ledger_id: str, main_file: str = "main.bean") -> LedgerPaths:
-        return self.storage.ledger_paths(ledger_id, main_file)
+    def paths(self, ledger: LedgerRef) -> LedgerPaths:
+        return self.storage.ledger_paths(ledger.workspace_id, ledger.id, ledger.main_file)
 
-    def repo(self, ledger_id: str) -> GitRepo:
-        return GitRepo(self.paths(ledger_id).repo)
+    def repo(self, ledger: LedgerRef) -> GitRepo:
+        return GitRepo(self.paths(ledger).repo)
 
-    def _handle(self, ledger_id: str, main_file: str = "main.bean") -> _LedgerHandle:
-        paths = self.paths(ledger_id, main_file)
+    def _handle(self, ledger: LedgerRef) -> _LedgerHandle:
+        paths = self.paths(ledger)
         with self._handles_lock:
-            handle = self._handles.get(ledger_id)
+            handle = self._handles.get(ledger.id)
             if handle is None:
                 handle = _LedgerHandle(paths)
-                self._handles[ledger_id] = handle
+                self._handles[ledger.id] = handle
             elif handle.fava is None and handle.paths != paths:
-                # Created by write_lock() or reload(), which do not know the ledger's main file;
-                # the first read names it, before the engine is loaded.
+                # The main file can be renamed before the engine is first loaded.
                 handle.paths = paths
             return handle
 
@@ -147,20 +154,22 @@ class LedgerStore:
     # --------------------------------------------------------------- lifecycle
     async def create(
         self,
-        ledger_id: str,
+        ledger: LedgerRef,
         *,
         template: str,
         title: str,
         currency: str,
         author: Author,
+        fiscal_year_end: str | None = None,
     ) -> str:
         if template not in TEMPLATES:
             raise ValidationError(f"Unknown template '{template}'")
-        paths = self.paths(ledger_id)
+        paths = self.paths(ledger)
         if paths.repo.exists():
             raise LedgerError("Ledger directory already exists")
         paths.repo.mkdir(parents=True)
         today = dt.date.today()
+        first_of_month = today.replace(day=1).isoformat()
         if template == "example":
             source = (SEED_DIR / "example.bean").read_text("utf-8")
             source = source.replace(
@@ -173,9 +182,14 @@ class LedgerStore:
                 .format(
                     title=title.replace('"', "'"),
                     currency=currency,
-                    date=today.replace(day=1).isoformat(),
+                    date=first_of_month,
                     date_next=(today.replace(day=1) + dt.timedelta(days=1)).isoformat(),
                 )
+            )
+        if fiscal_year_end:
+            source = (
+                f"{source.rstrip()}\n\n"
+                f'{first_of_month} custom "fava-option" "fiscal-year-end" "{fiscal_year_end}"\n'
             )
         paths.main_file.write_text(source, encoding="utf-8")
         (paths.repo / "README.md").write_text(
@@ -186,18 +200,24 @@ class LedgerStore:
         sha = await repo.commit_all("Create ledger", author)
         return sha or ""
 
-    async def delete(self, ledger_id: str) -> None:
-        self.evict(ledger_id)
-        paths = self.paths(ledger_id)
+    async def delete(self, ledger: LedgerRef) -> None:
+        self.evict(ledger.id)
+        paths = self.paths(ledger)
         if paths.root.exists():
             await asyncio.to_thread(shutil.rmtree, paths.root)
 
+    async def delete_workspace(self, workspace_id: str, ledger_ids: Iterable[str]) -> None:
+        """Remove everything a workspace keeps on disk, its ledgers included."""
+        for ledger_id in ledger_ids:
+            self.evict(ledger_id)
+        directory = self.storage.workspace_dir(workspace_id)
+        if directory.exists():
+            await asyncio.to_thread(shutil.rmtree, directory)
+
     # ------------------------------------------------------------- fava access
-    async def run(
-        self, ledger_id: str, fn: Callable[[FavaLedger], T], main_file: str = "main.bean"
-    ) -> T:
+    async def run(self, ledger: LedgerRef, fn: Callable[[FavaLedger], T]) -> T:
         """Run `fn(fava_ledger)` on a worker thread, serialised per ledger."""
-        handle = self._handle(ledger_id, main_file)
+        handle = self._handle(ledger)
 
         def _call() -> T:
             with handle.lock:
@@ -206,23 +226,23 @@ class LedgerStore:
 
         return await asyncio.to_thread(_call)
 
-    def write_lock(self, ledger_id: str) -> asyncio.Lock:
-        return self._handle(ledger_id).write_lock
+    def write_lock(self, ledger: LedgerRef) -> asyncio.Lock:
+        return self._handle(ledger).write_lock
 
-    async def commit(self, ledger_id: str, message: str, author: Author) -> str | None:
-        sha = await self.repo(ledger_id).commit_all(message, author)
-        await self.reload(ledger_id)
+    async def commit(self, ledger: LedgerRef, message: str, author: Author) -> str | None:
+        sha = await self.repo(ledger).commit_all(message, author)
+        await self.reload(ledger)
         if sha is not None:
             for listener in self.commit_listeners:
                 try:
-                    listener(ledger_id)
+                    listener(ledger.id)
                 except Exception:  # a listener must never turn a saved commit into an error
-                    log.exception("commit listener failed for ledger %s", ledger_id)
+                    log.exception("commit listener failed for ledger %s", ledger.id)
         return sha
 
-    async def reload(self, ledger_id: str) -> None:
+    async def reload(self, ledger: LedgerRef) -> None:
         """Make the cached engine pick up what is now in the working tree."""
-        handle = self._handle(ledger_id)
+        handle = self._handle(ledger)
 
         def _reload() -> None:
             with handle.lock:
@@ -232,11 +252,10 @@ class LedgerStore:
         await asyncio.to_thread(_reload)
 
     # ------------------------------------------------------------- projections
-    async def project(
-        self, ledger_id: str, changes: dict[str, str | None], main_file: str = "main.bean"
-    ) -> Projection:
+    async def project(self, ledger: LedgerRef, changes: dict[str, str | None]) -> Projection:
         """Apply `changes` (path -> new content, None = delete) to a scratch copy and bean-check it."""
-        paths = self.paths(ledger_id, main_file)
+        paths = self.paths(ledger)
+        main_file = ledger.main_file
 
         def _project() -> Projection:
             diffs: list[dict[str, str]] = []
@@ -297,8 +316,8 @@ class LedgerStore:
         return await asyncio.to_thread(_project)
 
     # --------------------------------------------------------- file helpers
-    def read_file(self, ledger_id: str, rel_path: str) -> tuple[str, str]:
-        paths = self.paths(ledger_id)
+    def read_file(self, ledger: LedgerRef, rel_path: str) -> tuple[str, str]:
+        paths = self.paths(ledger)
         target = safe_relative_path(paths.repo, rel_path)
         if not target.exists() or not target.is_file():
             raise NotFoundError(f"File not found: {rel_path}")
@@ -309,9 +328,9 @@ class LedgerStore:
         return text, sha256_text(text)
 
     def write_file(
-        self, ledger_id: str, rel_path: str, content: str, expected_sha: str | None = None
+        self, ledger: LedgerRef, rel_path: str, content: str, expected_sha: str | None = None
     ) -> str:
-        paths = self.paths(ledger_id)
+        paths = self.paths(ledger)
         target = safe_relative_path(paths.repo, rel_path)
         if expected_sha is not None and target.exists():
             current = target.read_text("utf-8")
@@ -324,14 +343,14 @@ class LedgerStore:
         target.write_text(content, encoding="utf-8")
         return sha256_text(content)
 
-    def write_bytes(self, ledger_id: str, rel_path: str, data: bytes) -> None:
-        paths = self.paths(ledger_id)
+    def write_bytes(self, ledger: LedgerRef, rel_path: str, data: bytes) -> None:
+        paths = self.paths(ledger)
         target = safe_relative_path(paths.repo, rel_path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
 
-    def delete_file(self, ledger_id: str, rel_path: str) -> None:
-        paths = self.paths(ledger_id)
+    def delete_file(self, ledger: LedgerRef, rel_path: str) -> None:
+        paths = self.paths(ledger)
         target = safe_relative_path(paths.repo, rel_path)
         if not target.exists():
             raise NotFoundError(f"File not found: {rel_path}")
@@ -340,8 +359,8 @@ class LedgerStore:
         else:
             target.unlink()
 
-    def rename_file(self, ledger_id: str, old_path: str, new_path: str) -> None:
-        paths = self.paths(ledger_id)
+    def rename_file(self, ledger: LedgerRef, old_path: str, new_path: str) -> None:
+        paths = self.paths(ledger)
         source = safe_relative_path(paths.repo, old_path)
         target = safe_relative_path(paths.repo, new_path)
         if not source.exists():
@@ -351,8 +370,8 @@ class LedgerStore:
         target.parent.mkdir(parents=True, exist_ok=True)
         source.rename(target)
 
-    def list_dir(self, ledger_id: str, rel_dir: str = "") -> list[dict[str, Any]]:
-        paths = self.paths(ledger_id)
+    def list_dir(self, ledger: LedgerRef, rel_dir: str = "") -> list[dict[str, Any]]:
+        paths = self.paths(ledger)
         base = safe_relative_path(paths.repo, rel_dir) if rel_dir else paths.repo
         if not base.exists() or not base.is_dir():
             raise NotFoundError(f"Directory not found: {rel_dir}")
@@ -373,8 +392,8 @@ class LedgerStore:
             )
         return entries
 
-    def repo_size(self, ledger_id: str) -> int:
-        paths = self.paths(ledger_id)
+    def repo_size(self, ledger: LedgerRef) -> int:
+        paths = self.paths(ledger)
         total = 0
         for child in paths.repo.rglob("*"):
             if ".git" in child.parts:

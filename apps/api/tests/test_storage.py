@@ -11,20 +11,26 @@ def test_ensure_layout_creates_directories_and_is_idempotent(tmp_path: Path):
     storage = Storage(tmp_path / "data")
     storage.ensure_layout()
     storage.ensure_layout()
-    assert storage.ledgers_dir.is_dir()
+    assert storage.workspaces_dir.is_dir()
     assert storage.uploads_dir.is_dir()
 
 
 def test_ledger_paths_follow_the_layout(tmp_path: Path):
-    paths = Storage(tmp_path).ledger_paths("abc123", "books.bean")
-    assert paths.root == tmp_path / "ledgers" / "abc123"
-    assert paths.repo == tmp_path / "ledgers" / "abc123" / "repo"
-    assert paths.main_file == tmp_path / "ledgers" / "abc123" / "repo" / "books.bean"
+    paths = Storage(tmp_path).ledger_paths("ws1", "abc123", "books.bean")
+    workspace = tmp_path / "workspaces" / "ws1"
+    assert Storage(tmp_path).workspace_dir("ws1") == workspace
+    assert paths.root == workspace / "ledgers" / "abc123"
+    assert paths.repo == workspace / "ledgers" / "abc123" / "repo"
+    assert paths.main_file == workspace / "ledgers" / "abc123" / "repo" / "books.bean"
 
 
-def test_ledger_id_must_be_a_plain_identifier(tmp_path: Path):
+def test_ids_must_be_plain_identifiers(tmp_path: Path):
     with pytest.raises(ValueError):
-        Storage(tmp_path).ledger_paths("../escape")
+        Storage(tmp_path).ledger_paths("ws1", "../escape")
+    with pytest.raises(ValueError):
+        Storage(tmp_path).ledger_paths("../escape", "abc123")
+    with pytest.raises(ValueError):
+        Storage(tmp_path).workspace_dir("ws/1")
 
 
 def test_upload_path_keeps_only_a_short_lowercase_extension(tmp_path: Path):

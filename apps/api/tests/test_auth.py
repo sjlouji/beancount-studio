@@ -10,7 +10,6 @@ async def test_signup_login_me_logout(client: AsyncClient):
             "email": "ada@example.com",
             "username": "ada",
             "password": "correct-horse-battery",
-            "createExampleLedger": False,
         },
     )
     assert res.status_code == 201, res.text
@@ -50,11 +49,11 @@ async def test_api_keys_scope(client: AsyncClient, user: dict):
     listed = await client.get("/api/api-keys")
     assert listed.json()[0]["keyPrefix"] == key[:12]
 
-    # A read-only key can read but cannot create ledgers.
+    # A read-only key can read but cannot create workspaces.
     client.cookies.clear()
     headers = {"Authorization": f"Bearer {key}"}
     assert (await client.get("/api/auth/me", headers=headers)).status_code == 200
-    denied = await client.post("/api/ledgers", json={"title": "x"}, headers=headers)
+    denied = await client.post("/api/workspaces", json={"name": "x"}, headers=headers)
     assert denied.status_code == 403
     # ...and cannot mint another key.
     assert (

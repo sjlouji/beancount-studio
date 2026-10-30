@@ -43,7 +43,6 @@ async def user(client: AsyncClient) -> dict:
             "email": f"{name}@example.com",
             "username": name,
             "password": "correct-horse-battery",
-            "createExampleLedger": False,
         },
     )
     assert res.status_code == 201, res.text
@@ -51,9 +50,21 @@ async def user(client: AsyncClient) -> dict:
 
 
 @pytest.fixture
-async def ledger(client: AsyncClient, user: dict) -> dict:
+async def workspace(client: AsyncClient, user: dict) -> dict:
+    import uuid
+
     res = await client.post(
-        "/api/ledgers", json={"title": "Test Books", "template": "example", "currency": "USD"}
+        "/api/workspaces", json={"name": "Test Books Co", "slug": f"ws{uuid.uuid4().hex[:8]}"}
+    )
+    assert res.status_code == 201, res.text
+    return res.json()
+
+
+@pytest.fixture
+async def ledger(client: AsyncClient, workspace: dict) -> dict:
+    res = await client.post(
+        f"/api/workspaces/{workspace['slug']}/ledgers",
+        json={"title": "Test Books", "template": "example", "currency": "USD"},
     )
     assert res.status_code == 201, res.text
     return res.json()

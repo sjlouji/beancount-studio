@@ -12,9 +12,9 @@ export interface AskState {
 }
 
 export interface LedgerContextValue {
-  owner: string;
+  workspace: string;
   slug: string;
-  /** `/ledger/<owner>/<slug>` */
+  /** `/w/<workspace>/<slug>` */
   base: string;
   ledger: Ledger;
   meta: LedgerMeta | undefined;
@@ -45,11 +45,11 @@ export function useLedgerContext(): LedgerContextValue {
   return value;
 }
 
-export function LedgerProvider({ owner, slug, ledger, children }: { owner: string; slug: string; ledger: Ledger; children: ReactNode }) {
-  const { data: meta } = useLedgerMeta(owner, slug);
-  const { data: attributes } = useLedgerAttributes(owner, slug);
+export function LedgerProvider({ workspace, slug, ledger, children }: { workspace: string; slug: string; ledger: Ledger; children: ReactNode }) {
+  const { data: meta } = useLedgerMeta(workspace, slug);
+  const { data: attributes } = useLedgerAttributes(workspace, slug);
   const { params, setParams, clear, queryString, hasFilters } = useReportParams();
-  const base = `/ledger/${owner}/${slug}`;
+  const base = `/w/${workspace}/${slug}`;
   const [ask, setAsk] = useState<AskState>({ open: false, threadId: null });
 
   const openAsk = useCallback(() => setAsk((s) => ({ ...s, open: true })), []);
@@ -59,7 +59,7 @@ export function LedgerProvider({ owner, slug, ledger, children }: { owner: strin
   const value = useMemo<LedgerContextValue>(() => {
     const conversion = params.conversion || meta?.operatingCurrencies[0] || "at_cost";
     return {
-      owner,
+      workspace,
       slug,
       base,
       ledger,
@@ -88,7 +88,7 @@ export function LedgerProvider({ owner, slug, ledger, children }: { owner: strin
       closeAsk,
       setAskThread,
     };
-  }, [owner, slug, base, ledger, meta, attributes, params, setParams, clear, queryString, hasFilters, ask, openAsk, closeAsk, setAskThread]);
+  }, [workspace, slug, base, ledger, meta, attributes, params, setParams, clear, queryString, hasFilters, ask, openAsk, closeAsk, setAskThread]);
 
   return <LedgerContext.Provider value={value}>{children}</LedgerContext.Provider>;
 }

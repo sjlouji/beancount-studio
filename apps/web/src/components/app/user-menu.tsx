@@ -23,7 +23,7 @@ export function initialsOf(name: string): string {
   return `${parts[0]![0]}${parts[parts.length - 1]![0]}`.toUpperCase();
 }
 
-/** The person's avatar: a rounded square with initials, as in the rail and the collaborator lists. */
+/** The person's avatar: a rounded square with initials, as in the rail and the member lists. */
 export function UserAvatar({ name, className }: { name: string; className?: string }) {
   return (
     <Avatar className={cn("size-7 rounded-lg", className)}>

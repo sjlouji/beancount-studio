@@ -16,7 +16,7 @@ from app.ledgers.store import get_store, is_text_path, safe_relative_path
 from app.logging_setup import get_logger
 
 log = get_logger(__name__)
-router = APIRouter(prefix="/ledgers/{owner}/{slug}/files", tags=["files"])
+router = APIRouter(prefix="/workspaces/{workspace}/ledgers/{slug}/files", tags=["files"])
 
 
 @router.get("/tree")
@@ -26,14 +26,14 @@ async def tree(
     store = get_store()
     ledger = access.ledger
     if ref and ref != "HEAD":
-        entries = await store.repo(ledger.id).ls_tree(ref, path)
+        entries = await store.repo(ledger).ls_tree(ref, path)
         return {
             "path": path,
             "ref": ref,
             "entries": [e.__dict__ | {"last_commit": None} for e in entries],
         }
-    entries = store.list_dir(ledger.id, path)
-    repo = store.repo(ledger.id)
+    entries = store.list_dir(ledger, path)
+    repo = store.repo(ledger)
     out = []
     for entry in entries:
         last = await repo.last_commit_for(entry["path"])
@@ -47,9 +47,9 @@ async def content(
 ):
     store = get_store()
     ledger = access.ledger
-    target = safe_relative_path(store.paths(ledger.id).repo, path)
+    target = safe_relative_path(store.paths(ledger).repo, path)
     if ref and ref != "HEAD":
-        data = await store.repo(ledger.id).read_blob(ref, path)
+        data = await store.repo(ledger).read_blob(ref, path)
         try:
             text = data.decode("utf-8")
         except UnicodeDecodeError:
@@ -69,8 +69,8 @@ async def content(
             text = target.read_text("utf-8")
         except UnicodeDecodeError:
             return {"path": path, "ref": "HEAD", "binary": True, "size": target.stat().st_size}
-    text, sha = store.read_file(ledger.id, path)
-    last = await store.repo(ledger.id).last_commit_for(path)
+    text, sha = store.read_file(ledger, path)
+    last = await store.repo(ledger).last_commit_for(path)
     return {
         "path": path,
         "ref": "HEAD",
@@ -86,7 +86,7 @@ async def content(
 async def raw(access: LedgerReadDep, path: str = Query(min_length=1)):
     """Serve a file (documents, receipts) with its content type."""
     store = get_store()
-    target = safe_relative_path(store.paths(access.ledger.id).repo, path)
+    target = safe_relative_path(store.paths(access.ledger).repo, path)
     if not target.exists() or not target.is_file():
         raise NotFoundError(f"File not found: {path}")
     media_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
@@ -104,12 +104,12 @@ class WriteFileRequest(BaseModel):
 async def write(body: WriteFileRequest, access: LedgerWriteDep):
     store = get_store()
     ledger = access.ledger
-    async with store.write_lock(ledger.id):
-        sha = store.write_file(ledger.id, body.path, body.content, body.sha256sum)
+    async with store.write_lock(ledger):
+        sha = store.write_file(ledger, body.path, body.content, body.sha256sum)
         commit = await store.commit(
-            ledger.id, body.message or f"Update {body.path}", author_for(access.auth.user)
+            ledger, body.message or f"Update {body.path}", author_for(access.auth.user)
         )
-        errors = await store.run(ledger.id, engine.errors, ledger.main_file)
+        errors = await store.run(ledger, engine.errors)
     return {"path": body.path, "sha256sum": sha, "commit": commit, "errors": errors}
 
 
@@ -123,13 +123,13 @@ class CreateFileRequest(BaseModel):
 async def create(body: CreateFileRequest, access: LedgerWriteDep):
     store = get_store()
     ledger = access.ledger
-    target = safe_relative_path(store.paths(ledger.id).repo, body.path)
+    target = safe_relative_path(store.paths(ledger).repo, body.path)
     if target.exists():
         raise ValidationError(f"{body.path} already exists")
-    async with store.write_lock(ledger.id):
-        sha = store.write_file(ledger.id, body.path, body.content)
+    async with store.write_lock(ledger):
+        sha = store.write_file(ledger, body.path, body.content)
         commit = await store.commit(
-            ledger.id, body.message or f"Create {body.path}", author_for(access.auth.user)
+            ledger, body.message or f"Create {body.path}", author_for(access.auth.user)
         )
     return {"path": body.path, "sha256sum": sha, "commit": commit}
 
@@ -144,10 +144,10 @@ class RenameRequest(BaseModel):
 async def rename(body: RenameRequest, access: LedgerWriteDep):
     store = get_store()
     ledger = access.ledger
-    async with store.write_lock(ledger.id):
-        store.rename_file(ledger.id, body.old_path, body.new_path)
+    async with store.write_lock(ledger):
+        store.rename_file(ledger, body.old_path, body.new_path)
         commit = await store.commit(
-            ledger.id,
+            ledger,
             body.message or f"Rename {body.old_path} to {body.new_path}",
             author_for(access.auth.user),
         )
@@ -165,10 +165,10 @@ async def delete(body: DeleteRequest, access: LedgerWriteDep):
     ledger = access.ledger
     if body.path == ledger.main_file:
         raise ValidationError("The main ledger file cannot be deleted")
-    async with store.write_lock(ledger.id):
-        store.delete_file(ledger.id, body.path)
+    async with store.write_lock(ledger):
+        store.delete_file(ledger, body.path)
         commit = await store.commit(
-            ledger.id, body.message or f"Delete {body.path}", author_for(access.auth.user)
+            ledger, body.message or f"Delete {body.path}", author_for(access.auth.user)
         )
     return {"deleted": body.path, "commit": commit}
 
@@ -184,17 +184,17 @@ async def upload(
     store = get_store()
     ledger = access.ledger
     written: list[str] = []
-    async with store.write_lock(ledger.id):
+    async with store.write_lock(ledger):
         for upload_file in files:
             name = (upload_file.filename or "upload").replace("\\", "/").split("/")[-1]
             data = await upload_file.read()
             if len(data) > settings.max_upload_bytes:
                 raise ValidationError(f"{name} exceeds the upload limit")
             rel = f"{directory.strip('/')}/{name}" if directory.strip("/") else name
-            store.write_bytes(ledger.id, rel, data)
+            store.write_bytes(ledger, rel, data)
             written.append(rel)
         commit = await store.commit(
-            ledger.id, message or f"Upload {', '.join(written)}", author_for(access.auth.user)
+            ledger, message or f"Upload {', '.join(written)}", author_for(access.auth.user)
         )
     return {"files": written, "commit": commit}
 
@@ -210,7 +210,7 @@ async def check(body: CheckRequest, access: LedgerReadDep):
     """Validate a projected set of file changes without committing them."""
     store = get_store()
     ledger = access.ledger
-    projection = await store.project(ledger.id, body.changes, ledger.main_file)
+    projection = await store.project(ledger, body.changes)
     return projection.to_dict()
 
 
@@ -220,9 +220,8 @@ class FormatRequest(BaseModel):
 
 @router.post("/format")
 async def format_source(body: FormatRequest, access: LedgerReadDep):
-    ledger = access.ledger
     formatted = await get_store().run(
-        ledger.id, lambda fava: engine.format_source(fava, body.source), ledger.main_file
+        access.ledger, lambda fava: engine.format_source(fava, body.source)
     )
     return {"source": formatted}
 

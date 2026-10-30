@@ -28,6 +28,7 @@ from app.routers import (
     system,
     uploads,
     users,
+    workspaces,
 )
 
 log = get_logger(__name__)
@@ -74,7 +75,10 @@ def create_app() -> FastAPI:
         auth.router,
         users.router,
         api_keys.router,
+        workspaces.router,
+        workspaces.invite_router,
         ledgers.router,
+        ledgers.workspace_router,
         reports.router,
         entries.router,
         files.router,

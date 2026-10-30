@@ -11,7 +11,7 @@ from app.ledgers import engine
 from app.ledgers.engine import ReportQuery
 from app.ledgers.store import get_store
 
-router = APIRouter(prefix="/ledgers/{owner}/{slug}", tags=["reports"])
+router = APIRouter(prefix="/workspaces/{workspace}/ledgers/{slug}", tags=["reports"])
 
 
 def report_query(
@@ -30,10 +30,7 @@ QueryDep = Annotated[ReportQuery, Depends(report_query)]
 
 
 async def _run(access: LedgerReadDep, fn, *args: Any, **kwargs: Any):
-    ledger = access.ledger
-    return await get_store().run(
-        ledger.id, lambda fava: fn(fava, *args, **kwargs), ledger.main_file
-    )
+    return await get_store().run(access.ledger, lambda fava: fn(fava, *args, **kwargs))
 
 
 @router.get("/meta")

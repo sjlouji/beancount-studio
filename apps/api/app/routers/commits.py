@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query
 from app.core.deps import LedgerReadDep
 from app.ledgers.store import get_store
 
-router = APIRouter(prefix="/ledgers/{owner}/{slug}/commits", tags=["commits"])
+router = APIRouter(prefix="/workspaces/{workspace}/ledgers/{slug}/commits", tags=["commits"])
 
 
 @router.get("")
@@ -17,7 +17,7 @@ async def list_commits(
     limit: int = Query(default=30, ge=1, le=100),
     path: str | None = Query(default=None),
 ):
-    repo = get_store().repo(access.ledger.id)
+    repo = get_store().repo(access.ledger)
     commits = await repo.log(limit=limit, skip=(page - 1) * limit, path=path)
     total = await repo.count_commits(path=path)
     return {"commits": [c.to_dict() for c in commits], "total": total, "page": page, "limit": limit}
@@ -25,5 +25,5 @@ async def list_commits(
 
 @router.get("/{sha}")
 async def commit_details(sha: str, access: LedgerReadDep):
-    details = await get_store().repo(access.ledger.id).show(sha)
+    details = await get_store().repo(access.ledger).show(sha)
     return details.to_dict()

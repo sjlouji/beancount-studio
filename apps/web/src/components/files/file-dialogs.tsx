@@ -24,7 +24,7 @@ import { apiDelete, apiPost, errorMessage } from "@/lib/api/client";
 import { ledgerPath, useInvalidateLedger } from "@/lib/api/hooks";
 
 interface LedgerRef {
-  owner: string;
+  workspace: string;
   slug: string;
 }
 
@@ -32,23 +32,23 @@ export function editorHref(base: string, path: string, line?: number): string {
   return `${base}/files/edit?path=${encodeURIComponent(path)}${line ? `&line=${line}` : ""}`;
 }
 
-export function NewFileDialog({ owner, slug, base, directory, open, onOpenChange }: LedgerRef & { base: string; directory: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function NewFileDialog({ workspace, slug, base, directory, open, onOpenChange }: LedgerRef & { base: string; directory: string; open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <NewFileForm owner={owner} slug={slug} base={base} directory={directory} onDone={() => onOpenChange(false)} />
+        <NewFileForm workspace={workspace} slug={slug} base={base} directory={directory} onDone={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );
 }
 
-function NewFileForm({ owner, slug, base, directory, onDone }: LedgerRef & { base: string; directory: string; onDone: () => void }) {
+function NewFileForm({ workspace, slug, base, directory, onDone }: LedgerRef & { base: string; directory: string; onDone: () => void }) {
   const router = useRouter();
-  const invalidate = useInvalidateLedger(owner, slug);
+  const invalidate = useInvalidateLedger(workspace, slug);
   const [path, setPath] = useState(directory ? `${directory}/` : "");
   const [content, setContent] = useState("");
   const create = useMutation({
-    mutationFn: (input: { path: string; content: string }) => apiPost<{ path: string; sha256sum: string; commit: string | null }>(`${ledgerPath(owner, slug)}/files`, input),
+    mutationFn: (input: { path: string; content: string }) => apiPost<{ path: string; sha256sum: string; commit: string | null }>(`${ledgerPath(workspace, slug)}/files`, input),
     onSuccess: (result) => {
       invalidate();
       toast.success(`Created ${result.path}`);
@@ -91,19 +91,19 @@ function NewFileForm({ owner, slug, base, directory, onDone }: LedgerRef & { bas
   );
 }
 
-export function RenameFileDialog({ owner, slug, path, onClose }: LedgerRef & { path: string | null; onClose: () => void }) {
+export function RenameFileDialog({ workspace, slug, path, onClose }: LedgerRef & { path: string | null; onClose: () => void }) {
   return (
     <Dialog open={path !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>{path !== null && <RenameForm key={path} owner={owner} slug={slug} path={path} onDone={onClose} />}</DialogContent>
+      <DialogContent>{path !== null && <RenameForm key={path} workspace={workspace} slug={slug} path={path} onDone={onClose} />}</DialogContent>
     </Dialog>
   );
 }
 
-function RenameForm({ owner, slug, path, onDone }: LedgerRef & { path: string; onDone: () => void }) {
-  const invalidate = useInvalidateLedger(owner, slug);
+function RenameForm({ workspace, slug, path, onDone }: LedgerRef & { path: string; onDone: () => void }) {
+  const invalidate = useInvalidateLedger(workspace, slug);
   const [target, setTarget] = useState(path);
   const rename = useMutation({
-    mutationFn: (input: { oldPath: string; newPath: string }) => apiPost<{ path: string; commit: string | null }>(`${ledgerPath(owner, slug)}/files/rename`, input),
+    mutationFn: (input: { oldPath: string; newPath: string }) => apiPost<{ path: string; commit: string | null }>(`${ledgerPath(workspace, slug)}/files/rename`, input),
     onSuccess: (result) => {
       invalidate();
       toast.success(`Renamed to ${result.path}`);
@@ -143,10 +143,10 @@ function RenameForm({ owner, slug, path, onDone }: LedgerRef & { path: string; o
   );
 }
 
-export function DeleteFileDialog({ owner, slug, path, onClose }: LedgerRef & { path: string | null; onClose: () => void }) {
-  const invalidate = useInvalidateLedger(owner, slug);
+export function DeleteFileDialog({ workspace, slug, path, onClose }: LedgerRef & { path: string | null; onClose: () => void }) {
+  const invalidate = useInvalidateLedger(workspace, slug);
   const remove = useMutation({
-    mutationFn: (target: string) => apiDelete<{ deleted: string; commit: string | null }>(`${ledgerPath(owner, slug)}/files`, { path: target }),
+    mutationFn: (target: string) => apiDelete<{ deleted: string; commit: string | null }>(`${ledgerPath(workspace, slug)}/files`, { path: target }),
     onSuccess: (result) => {
       invalidate();
       toast.success(`Deleted ${result.deleted}`);

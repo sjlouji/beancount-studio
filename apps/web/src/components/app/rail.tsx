@@ -8,7 +8,9 @@ import { BrandMark } from "@/components/app/brand";
 import { UserMenu } from "@/components/app/user-menu";
 import { NewLedgerDialog } from "@/components/ledger/new-ledger-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useMe } from "@/lib/api/hooks";
+import { canWrite } from "@/components/workspace/rules";
+import { useCurrentWorkspace } from "@/components/workspace/use-current-workspace";
+import { workspaceHref } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 export interface RailSection {
@@ -26,10 +28,6 @@ export interface RailExtra {
   onAsk?: () => void;
   askActive?: boolean;
 }
-
-const ITEMS: Array<{ label: string; href: string; icon: LucideIcon; match: (pathname: string) => boolean }> = [
-  { label: "Home", href: "/ledgers", icon: HouseIcon, match: (p) => p === "/ledgers" },
-];
 
 function RailButton({ label, icon: Icon, active, href, onClick }: { label: string; icon: LucideIcon; active?: boolean; href?: string; onClick?: () => void }) {
   const className = cn(
@@ -58,25 +56,24 @@ function RailButton({ label, icon: Icon, active, href, onClick }: { label: strin
   );
 }
 
-/** The narrow leftmost column: workspace mark, Home, a ledger's sections and Ask, new ledger and the account (settings live in its menu). */
+/** The narrow leftmost column: the brand mark, the workspace's Home, a ledger's sections and Ask, new ledger and the account (settings live in its menu). */
 export function Rail({ extra, className }: { extra?: RailExtra; className?: string }) {
   const pathname = usePathname();
-  const { data: me } = useMe();
+  const { slug, workspace } = useCurrentWorkspace();
   const [creating, setCreating] = useState(false);
+  const home = slug ? workspaceHref(slug) : "/";
   return (
     <nav aria-label="Primary" className={cn("w-18 shrink-0 flex-col items-center gap-1 border-r border-sidebar-border bg-rail px-1 py-2", className)}>
-      <Link href="/ledgers" aria-label="Beancount Studio home" className="mb-2 rounded-[9px] outline-none focus-visible:ring-3 focus-visible:ring-ring/40">
+      <Link href="/" aria-label="Beancount Studio home" className="mb-2 rounded-[9px] outline-none focus-visible:ring-3 focus-visible:ring-ring/40">
         <BrandMark className="size-9 rounded-[9px] text-lg" />
       </Link>
-      {ITEMS.map((item) => (
-        <RailButton key={item.href} label={item.label} icon={item.icon} href={item.href} active={item.match(pathname)} />
-      ))}
+      <RailButton label="Home" icon={HouseIcon} href={home} active={pathname === home} />
       {extra?.sections?.map((section) => (
         <RailButton key={section.id} label={section.label} icon={section.icon} href={section.href} active={section.active} />
       ))}
       {extra?.onAsk && <RailButton label="Ask" icon={SparklesIcon} onClick={extra.onAsk} active={extra.askActive} />}
       <div className="mt-auto flex flex-col items-center gap-2">
-        {me && (
+        {canWrite(workspace?.role) && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button type="button" onClick={() => setCreating(true)} aria-label="New ledger" className="press flex size-9 items-center justify-center rounded-full bg-fill text-rail-foreground outline-none transition-colors hover:bg-rail-accent focus-visible:ring-3 focus-visible:ring-ring/40">

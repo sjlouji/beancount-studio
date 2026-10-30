@@ -34,11 +34,20 @@ _engine = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
+def _enforce_sqlite_foreign_keys(dbapi_connection, _record) -> None:
+    """SQLite honours ON DELETE actions only when each connection asks; PostgreSQL always does."""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
 def get_engine():
     global _engine
     if _engine is None:
         settings = get_settings()
         _engine = create_async_engine(settings.resolved_database_url, future=True)
+        if _engine.dialect.name == "sqlite":
+            sa.event.listen(_engine.sync_engine, "connect", _enforce_sqlite_foreign_keys)
     return _engine
 
 
@@ -85,8 +94,14 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         if engine.dialect.name == "sqlite":
             await conn.exec_driver_sql("PRAGMA journal_mode=WAL")
-            await conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+            # Batch migrations rebuild a table by copy, drop and rename; with enforcement on,
+            # the drop would cascade into every row referencing the table. Nothing has opened
+            # a transaction on this connection yet, so the pragma takes effect.
+            await conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
         await conn.run_sync(upgrade_schema)
+    if engine.dialect.name == "sqlite":
+        # The migration connection must not go back to the pool with enforcement off.
+        await engine.dispose()
 
 
 async def dispose_db() -> None:

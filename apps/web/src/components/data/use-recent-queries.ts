@@ -4,8 +4,8 @@ import { useCallback, useState } from "react";
 
 const MAX_RECENT = 10;
 
-function storageKey(owner: string, slug: string): string {
-  return `beancount-studio:recent-queries:${owner}/${slug}`;
+function storageKey(workspace: string, slug: string): string {
+  return `beancount-studio:recent-queries:${workspace}/${slug}`;
 }
 
 function load(key: string): string[] {
@@ -19,8 +19,8 @@ function load(key: string): string[] {
 }
 
 /** The last 10 distinct queries run in this ledger, newest first, persisted in localStorage. */
-export function useRecentQueries(owner: string, slug: string) {
-  const key = storageKey(owner, slug);
+export function useRecentQueries(workspace: string, slug: string) {
+  const key = storageKey(workspace, slug);
   // Ledger pages render only after client-side data loads, so reading storage here is hydration-safe.
   const [recent, setRecent] = useState<string[]>(() => load(key));
 

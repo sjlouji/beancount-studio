@@ -20,7 +20,7 @@ from app.logging_setup import get_logger
 from app.routers.uploads import load_upload
 
 log = get_logger(__name__)
-router = APIRouter(prefix="/ledgers/{owner}/{slug}/receipts", tags=["receipts"])
+router = APIRouter(prefix="/workspaces/{workspace}/ledgers/{slug}/receipts", tags=["receipts"])
 
 
 class ParseRequest(BaseModel):
@@ -38,8 +38,7 @@ async def parse(
             f"Receipt scanning needs the AI assistant. {AI_DISABLED_MESSAGE}"
         )
     upload, data = await load_upload(db, user, body.upload_id)
-    ledger = access.ledger
-    attrs = await get_store().run(ledger.id, engine.attributes, ledger.main_file)
+    attrs = await get_store().run(access.ledger, engine.attributes)
     parsed = await parse_receipt(
         settings,
         data=data,
@@ -95,8 +94,8 @@ async def insert(body: InsertRequest, access: LedgerWriteDep, user: UserDep, db:
             f"receipts/{body.date}-{_slug(body.payee or body.narration)}-{upload.id[:6]}{ext}"
         )
         meta["receipt"] = receipt_rel
-    meta_obj = await store.run(ledger.id, engine.ledger_meta, ledger.main_file)
-    target_file = body.filename or await store.run(ledger.id, engine.default_file, ledger.main_file)
+    meta_obj = await store.run(ledger, engine.ledger_meta)
+    target_file = body.filename or await store.run(ledger, engine.default_file)
     text = render_transaction(
         txn_date=body.date,
         payee=body.payee.strip(),
@@ -110,16 +109,16 @@ async def insert(body: InsertRequest, access: LedgerWriteDep, user: UserDep, db:
         meta=meta,
         currency_column=meta_obj["favaOptions"]["currencyColumn"],
     )
-    async with store.write_lock(ledger.id):
+    async with store.write_lock(ledger):
         if receipt_rel and upload_bytes is not None:
-            store.write_bytes(ledger.id, receipt_rel, upload_bytes)
-        current, _ = store.read_file(ledger.id, target_file)
+            store.write_bytes(ledger, receipt_rel, upload_bytes)
+        current, _ = store.read_file(ledger, target_file)
         sep = "" if current.endswith("\n\n") else ("\n" if current.endswith("\n") else "\n\n")
-        store.write_file(ledger.id, target_file, current + sep + text)
+        store.write_file(ledger, target_file, current + sep + text)
         sha = await store.commit(
-            ledger.id,
+            ledger,
             f"Add receipt: {body.payee or body.narration}"[:120],
             author_for(access.auth.user),
         )
-        errors = await store.run(ledger.id, engine.errors, ledger.main_file)
+        errors = await store.run(ledger, engine.errors)
     return {"commit": sha, "file": target_file, "receiptPath": receipt_rel, "errors": errors}

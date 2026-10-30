@@ -50,25 +50,25 @@ function uploadFiles(url: string, files: File[], directory: string, onProgress: 
   });
 }
 
-export function UploadDialog({ owner, slug, directory, open, onOpenChange }: { owner: string; slug: string; directory: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function UploadDialog({ workspace, slug, directory, open, onOpenChange }: { workspace: string; slug: string; directory: string; open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <UploadForm owner={owner} slug={slug} directory={directory} onDone={() => onOpenChange(false)} />
+        <UploadForm workspace={workspace} slug={slug} directory={directory} onDone={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );
 }
 
-function UploadForm({ owner, slug, directory, onDone }: { owner: string; slug: string; directory: string; onDone: () => void }) {
-  const invalidate = useInvalidateLedger(owner, slug);
+function UploadForm({ workspace, slug, directory, onDone }: { workspace: string; slug: string; directory: string; onDone: () => void }) {
+  const invalidate = useInvalidateLedger(workspace, slug);
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState(0);
 
   const upload = useMutation({
-    mutationFn: () => uploadFiles(`/api${ledgerPath(owner, slug)}/files/upload`, files, directory, setProgress),
+    mutationFn: () => uploadFiles(`/api${ledgerPath(workspace, slug)}/files/upload`, files, directory, setProgress),
     onSuccess: (result) => {
       invalidate();
       toast.success(`Uploaded ${result.files.length} ${result.files.length === 1 ? "file" : "files"}`);

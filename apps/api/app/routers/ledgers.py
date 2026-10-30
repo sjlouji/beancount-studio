@@ -1,8 +1,6 @@
-"""Ledger metadata: create/list/update/delete, gallery, stars, collaborators, archive, activity."""
+"""Ledger metadata: list, create, update, delete, gallery, stars, archive, activity."""
 
 from __future__ import annotations
-
-import re
 
 from fastapi import APIRouter, Query, Response
 from fastapi.responses import StreamingResponse
@@ -10,6 +8,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import (
+    LEDGER_ROLE_FOR,
     AuthContext,
     AuthDep,
     DbDep,
@@ -17,31 +16,27 @@ from app.core.deps import (
     LedgerAdminDep,
     LedgerReadDep,
     UserDep,
+    WorkspaceDep,
     author_for,
     resolve_role,
 )
-from app.db.models import Ledger, LedgerCollaborator, LedgerStar, User, new_id
-from app.errors import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.db.models import Ledger, LedgerStar, Workspace, WorkspaceMember, new_id
+from app.errors import ConflictError, ForbiddenError, ValidationError
 from app.ledgers.remotes import get_remote_sync, parse_source
 from app.ledgers.store import get_store
 from app.logging_setup import get_logger
 from app.schemas import (
-    SLUG_RE,
-    CollaboratorOut,
-    CollaboratorUpsertRequest,
     LedgerCreateRequest,
     LedgerOut,
     LedgerUpdateRequest,
     RemoteOut,
+    ledger_slug_error,
+    slugify,
 )
 
 log = get_logger(__name__)
 router = APIRouter(prefix="/ledgers", tags=["ledgers"])
-
-
-def slugify(value: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return slug[:80] or "ledger"
+workspace_router = APIRouter(prefix="/workspaces/{workspace}/ledgers", tags=["ledgers"])
 
 
 async def _is_starred(db: AsyncSession, auth: AuthContext, ledger_id: str) -> bool:
@@ -53,14 +48,13 @@ async def _is_starred(db: AsyncSession, auth: AuthContext, ledger_id: str) -> bo
 async def ledger_out(
     db: AsyncSession, ledger: Ledger, access: LedgerAccess, *, with_commit: bool = True
 ) -> LedgerOut:
-    owner = await db.get(User, ledger.owner_id)
     last_commit = None
     if with_commit:
-        commits = await get_store().repo(ledger.id).log(limit=1)
+        commits = await get_store().repo(ledger).log(limit=1)
         last_commit = commits[0].to_dict() if commits else None
     return LedgerOut(
         id=ledger.id,
-        owner=owner.username if owner else "",
+        workspace=ledger.workspace.slug,
         slug=ledger.slug,
         title=ledger.title,
         description=ledger.description,
@@ -80,18 +74,33 @@ async def ledger_out(
     )
 
 
-@router.get("", response_model=list[LedgerOut])
-async def list_my_ledgers(user: UserDep, db: DbDep, auth: AuthDep):
-    owned = (await db.execute(select(Ledger).where(Ledger.owner_id == user.id))).scalars().all()
-    shared_ids = select(LedgerCollaborator.ledger_id).where(LedgerCollaborator.user_id == user.id)
-    shared = (await db.execute(select(Ledger).where(Ledger.id.in_(shared_ids)))).scalars().all()
+def _my_ledgers(user_id: str):
+    """Every ledger in a workspace the person belongs to, most recently changed first."""
+    return (
+        select(Ledger)
+        .join(WorkspaceMember, WorkspaceMember.workspace_id == Ledger.workspace_id)
+        .where(WorkspaceMember.user_id == user_id)
+        .order_by(Ledger.updated_at.desc())
+    )
+
+
+async def _visible(
+    db: AsyncSession, ledgers: list[Ledger], auth: AuthContext, *, with_commit: bool
+) -> list[LedgerOut]:
     out: list[LedgerOut] = []
-    for ledger in sorted([*owned, *shared], key=lambda row: row.updated_at, reverse=True):
+    for ledger in ledgers:
         role = await resolve_role(db, ledger, auth)
         if role is None:
             continue
-        out.append(await ledger_out(db, ledger, LedgerAccess(ledger=ledger, role=role, auth=auth)))
+        access = LedgerAccess(ledger=ledger, role=role, auth=auth)
+        out.append(await ledger_out(db, ledger, access, with_commit=with_commit))
     return out
+
+
+@router.get("", response_model=list[LedgerOut])
+async def list_my_ledgers(user: UserDep, db: DbDep, auth: AuthDep):
+    rows = (await db.execute(_my_ledgers(user.id))).scalars().all()
+    return await _visible(db, list(rows), auth, with_commit=True)
 
 
 @router.get("/gallery", response_model=list[LedgerOut])
@@ -111,55 +120,40 @@ async def gallery(db: DbDep, auth: AuthDep, q: str | None = Query(default=None, 
         .scalars()
         .all()
     )
-    out: list[LedgerOut] = []
-    for ledger in rows:
-        role = await resolve_role(db, ledger, auth)
-        if role is None:
-            continue
-        out.append(
-            await ledger_out(
-                db, ledger, LedgerAccess(ledger=ledger, role=role, auth=auth), with_commit=False
-            )
-        )
-    return out
+    return await _visible(db, list(rows), auth, with_commit=False)
 
 
 @router.get("/starred", response_model=list[LedgerOut])
 async def starred(user: UserDep, db: DbDep, auth: AuthDep):
     ids = select(LedgerStar.ledger_id).where(LedgerStar.user_id == user.id)
     rows = (await db.execute(select(Ledger).where(Ledger.id.in_(ids)))).scalars().all()
-    out: list[LedgerOut] = []
-    for ledger in rows:
-        role = await resolve_role(db, ledger, auth)
-        if role is None:
-            continue
-        out.append(
-            await ledger_out(
-                db, ledger, LedgerAccess(ledger=ledger, role=role, auth=auth), with_commit=False
-            )
-        )
-    return out
+    return await _visible(db, list(rows), auth, with_commit=False)
 
 
 @router.get("/activity")
 async def activity(
-    user: UserDep, db: DbDep, auth: AuthDep, limit: int = Query(default=20, ge=1, le=100)
+    user: UserDep,
+    db: DbDep,
+    limit: int = Query(default=20, ge=1, le=100),
+    workspace: str | None = Query(default=None, max_length=40),
 ):
-    """Recent commits across the caller's ledgers (owned and shared)."""
-    owned = (await db.execute(select(Ledger).where(Ledger.owner_id == user.id))).scalars().all()
-    shared_ids = select(LedgerCollaborator.ledger_id).where(LedgerCollaborator.user_id == user.id)
-    shared = (await db.execute(select(Ledger).where(Ledger.id.in_(shared_ids)))).scalars().all()
+    """Recent commits across the caller's ledgers, in every workspace or just one."""
+    stmt = _my_ledgers(user.id)
+    if workspace:
+        stmt = stmt.join(Workspace, Workspace.id == Ledger.workspace_id).where(
+            Workspace.slug == workspace
+        )
+    rows = (await db.execute(stmt)).scalars().all()
     items = []
     store = get_store()
-    for ledger in [*owned, *shared]:
-        owner = await db.get(User, ledger.owner_id)
-        commits = await store.repo(ledger.id).log(limit=10)
+    for ledger in rows:
+        commits = await store.repo(ledger).log(limit=10)
         for c in commits:
             items.append(
                 {
                     **c.to_dict(),
                     "ledger": {
-                        "owner": owner.username if owner else "",
+                        "workspace": ledger.workspace.slug,
                         "slug": ledger.slug,
                         "title": ledger.title,
                     },
@@ -169,28 +163,56 @@ async def activity(
     return {"items": items[:limit], "total": len(items)}
 
 
-@router.post("", response_model=LedgerOut, status_code=201)
-async def create_ledger(body: LedgerCreateRequest, user: UserDep, db: DbDep, auth: AuthDep):
-    if not auth.can_write_scope:
+@workspace_router.get("", response_model=list[LedgerOut])
+async def list_workspace_ledgers(access: WorkspaceDep, db: DbDep):
+    rows = (
+        (
+            await db.execute(
+                select(Ledger)
+                .where(Ledger.workspace_id == access.workspace.id)
+                .order_by(Ledger.updated_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    role = LEDGER_ROLE_FOR[access.role]
+    return [
+        await ledger_out(db, ledger, LedgerAccess(ledger=ledger, role=role, auth=access.auth))
+        for ledger in rows
+    ]
+
+
+@workspace_router.post("", response_model=LedgerOut, status_code=201)
+async def create_ledger(body: LedgerCreateRequest, access: WorkspaceDep, db: DbDep):
+    if not access.auth.can_write_scope:
         raise ForbiddenError("This API key is read-only")
-    slug = body.slug.strip().lower() if body.slug else slugify(body.title)
-    if not SLUG_RE.match(slug):
-        raise ValidationError("Slug must be lowercase letters, digits or hyphens")
+    if not access.can_write:
+        raise ForbiddenError("Viewers cannot create ledgers in this workspace")
+    user = access.user
+    workspace = access.workspace
+    slug = body.slug.strip().lower() if body.slug else slugify(body.title) or "ledger"
+    if problem := ledger_slug_error(slug):
+        raise ValidationError(problem)
     exists = (
-        await db.execute(select(Ledger).where(Ledger.owner_id == user.id, Ledger.slug == slug))
+        await db.execute(
+            select(Ledger).where(Ledger.workspace_id == workspace.id, Ledger.slug == slug)
+        )
     ).scalar_one_or_none()
     if exists is not None:
-        raise ConflictError(f"You already have a ledger at /{user.username}/{slug}")
+        raise ConflictError(f"A ledger already lives at /{workspace.slug}/{slug}")
     source = parse_source(body.source.url) if body.source is not None else None
     # The repository is prepared before the row exists, so a clone that takes minutes never
     # holds a database write transaction open (SQLite would block every other writer).
     ledger = Ledger(
         id=new_id(),
-        owner_id=user.id,
+        workspace_id=workspace.id,
+        workspace=workspace,
         slug=slug,
         title=body.title.strip(),
         description=body.description.strip(),
         visibility=body.visibility,
+        main_file="main.bean",
         remote=None,
     )
     if body.source is not None and source is not None:
@@ -205,70 +227,72 @@ async def create_ledger(body: LedgerCreateRequest, user: UserDep, db: DbDep, aut
         )
     else:
         await get_store().create(
-            ledger.id,
+            ledger,
             template=body.template,
             title=ledger.title,
             currency=body.currency,
             author=author_for(user),
+            fiscal_year_end=body.fiscal_year_end,
         )
     db.add(ledger)
     try:
         await db.commit()
     except Exception:
         await db.rollback()
-        await get_store().delete(ledger.id)
+        await get_store().delete(ledger)
         raise
     if source is not None:
-        log.info("ledger %s/%s created from %s", user.username, slug, source.url)
+        log.info("ledger %s/%s created from %s", workspace.slug, slug, source.url)
     else:
-        log.info("ledger %s/%s created from template %s", user.username, slug, body.template)
-    return await ledger_out(db, ledger, LedgerAccess(ledger=ledger, role="owner", auth=auth))
+        log.info("ledger %s/%s created from template %s", workspace.slug, slug, body.template)
+    role = LEDGER_ROLE_FOR[access.role]
+    return await ledger_out(db, ledger, LedgerAccess(ledger=ledger, role=role, auth=access.auth))
 
 
-@router.get("/{owner}/{slug}", response_model=LedgerOut)
+@workspace_router.get("/{slug}", response_model=LedgerOut)
 async def get_ledger(access: LedgerReadDep, db: DbDep):
     return await ledger_out(db, access.ledger, access)
 
 
-@router.patch("/{owner}/{slug}", response_model=LedgerOut)
+@workspace_router.patch("/{slug}", response_model=LedgerOut)
 async def update_ledger(body: LedgerUpdateRequest, access: LedgerAdminDep, db: DbDep):
     ledger = access.ledger
     if body.slug is not None and body.slug != ledger.slug:
         slug = body.slug.strip().lower()
-        if not SLUG_RE.match(slug):
-            raise ValidationError("Slug must be lowercase letters, digits or hyphens")
+        if problem := ledger_slug_error(slug):
+            raise ValidationError(problem)
         clash = (
             await db.execute(
-                select(Ledger).where(Ledger.owner_id == ledger.owner_id, Ledger.slug == slug)
+                select(Ledger).where(
+                    Ledger.workspace_id == ledger.workspace_id, Ledger.slug == slug
+                )
             )
         ).scalar_one_or_none()
         if clash is not None:
-            raise ConflictError("A ledger with that slug already exists")
+            raise ConflictError("A ledger with that slug already exists in this workspace")
         ledger.slug = slug
     if body.title is not None:
         ledger.title = body.title.strip()
     if body.description is not None:
         ledger.description = body.description.strip()
     if body.visibility is not None:
-        if not access.is_owner:
-            raise ForbiddenError("Only the owner can change visibility")
         ledger.visibility = body.visibility
     await db.commit()
     return await ledger_out(db, ledger, access)
 
 
-@router.delete("/{owner}/{slug}", status_code=204)
+@workspace_router.delete("/{slug}", status_code=204)
 async def delete_ledger(access: LedgerReadDep, db: DbDep):
-    if not access.is_owner or access.auth.kind != "session":
-        raise ForbiddenError("Only the owner can delete a ledger from a signed-in session")
-    await get_store().delete(access.ledger.id)
+    if not access.can_admin or access.auth.kind != "session":
+        raise ForbiddenError("Only a workspace admin can delete a ledger, from a signed-in session")
+    await get_store().delete(access.ledger)
     await db.delete(access.ledger)
     await db.commit()
     log.info("ledger %s deleted", access.ledger.id)
     return Response(status_code=204)
 
 
-@router.post("/{owner}/{slug}/star", response_model=LedgerOut)
+@workspace_router.post("/{slug}/star", response_model=LedgerOut)
 async def star(access: LedgerReadDep, user: UserDep, db: DbDep):
     if await db.get(LedgerStar, {"user_id": user.id, "ledger_id": access.ledger.id}) is None:
         db.add(LedgerStar(user_id=user.id, ledger_id=access.ledger.id))
@@ -277,7 +301,7 @@ async def star(access: LedgerReadDep, user: UserDep, db: DbDep):
     return await ledger_out(db, access.ledger, access, with_commit=False)
 
 
-@router.delete("/{owner}/{slug}/star", response_model=LedgerOut)
+@workspace_router.delete("/{slug}/star", response_model=LedgerOut)
 async def unstar(access: LedgerReadDep, user: UserDep, db: DbDep):
     row = await db.get(LedgerStar, {"user_id": user.id, "ledger_id": access.ledger.id})
     if row is not None:
@@ -287,71 +311,9 @@ async def unstar(access: LedgerReadDep, user: UserDep, db: DbDep):
     return await ledger_out(db, access.ledger, access, with_commit=False)
 
 
-@router.get("/{owner}/{slug}/collaborators", response_model=list[CollaboratorOut])
-async def list_collaborators(access: LedgerReadDep, db: DbDep):
-    rows = (
-        await db.execute(
-            select(LedgerCollaborator, User)
-            .join(User, User.id == LedgerCollaborator.user_id)
-            .where(LedgerCollaborator.ledger_id == access.ledger.id)
-            .order_by(User.username)
-        )
-    ).all()
-    return [
-        CollaboratorOut(
-            username=u.username, display_name=u.display_name, role=c.role, created_at=c.created_at
-        )
-        for c, u in rows
-    ]
-
-
-@router.put("/{owner}/{slug}/collaborators/{username}", response_model=CollaboratorOut)
-async def upsert_collaborator(
-    username: str, body: CollaboratorUpsertRequest, access: LedgerAdminDep, db: DbDep
-):
-    target = (
-        await db.execute(select(User).where(User.username == username.lower()))
-    ).scalar_one_or_none()
-    if target is None:
-        raise NotFoundError("User not found")
-    if target.id == access.ledger.owner_id:
-        raise ValidationError("The owner already has full access")
-    row = await db.get(LedgerCollaborator, {"ledger_id": access.ledger.id, "user_id": target.id})
-    if row is None:
-        row = LedgerCollaborator(ledger_id=access.ledger.id, user_id=target.id, role=body.role)
-        db.add(row)
-    else:
-        row.role = body.role
-    await db.commit()
-    await db.refresh(row)
-    return CollaboratorOut(
-        username=target.username,
-        display_name=target.display_name,
-        role=row.role,
-        created_at=row.created_at,
-    )
-
-
-@router.delete("/{owner}/{slug}/collaborators/{username}", status_code=204)
-async def remove_collaborator(username: str, access: LedgerReadDep, user: UserDep, db: DbDep):
-    target = (
-        await db.execute(select(User).where(User.username == username.lower()))
-    ).scalar_one_or_none()
-    if target is None:
-        raise NotFoundError("User not found")
-    # A collaborator may remove themselves; otherwise admin is required.
-    if target.id != user.id and not access.can_admin:
-        raise ForbiddenError("You need admin access to remove collaborators")
-    row = await db.get(LedgerCollaborator, {"ledger_id": access.ledger.id, "user_id": target.id})
-    if row is not None:
-        await db.delete(row)
-        await db.commit()
-    return Response(status_code=204)
-
-
-@router.get("/{owner}/{slug}/archive")
+@workspace_router.get("/{slug}/archive")
 async def archive(access: LedgerReadDep):
-    data = await get_store().repo(access.ledger.id).archive_zip()
+    data = await get_store().repo(access.ledger).archive_zip()
     filename = f"{access.ledger.slug}.zip"
     return StreamingResponse(
         iter([data]),

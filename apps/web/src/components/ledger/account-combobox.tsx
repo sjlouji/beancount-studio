@@ -34,8 +34,8 @@ export function AccountCombobox({
   id?: string;
   disabled?: boolean;
 }) {
-  const { owner, slug } = useLedgerContext();
-  const { data: attributes } = useLedgerAttributes(owner, slug);
+  const { workspace, slug } = useLedgerContext();
+  const { data: attributes } = useLedgerAttributes(workspace, slug);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 

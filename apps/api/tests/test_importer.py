@@ -59,8 +59,7 @@ def test_render_transaction():
 
 
 async def test_import_roundtrip(client: AsyncClient, user: dict, ledger: dict):
-    owner, slug = ledger["owner"], ledger["slug"]
-    base = f"/api/ledgers/{owner}/{slug}/imports"
+    base = f"/api/workspaces/{ledger['workspace']}/ledgers/{ledger['slug']}/imports"
     csv_bytes = (
         b"Date,Description,Amount\n2025-12-03,Blue Bottle,-6.25\n2025-12-04,Salary,3000.00\n"
     )

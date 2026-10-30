@@ -99,10 +99,10 @@ export function CommandPalette() {
             <CommandSeparator />
             <CommandGroup heading="Ledgers">
               {ledgers.map((item) => (
-                <CommandItem key={item.id} value={`ledger ${item.title} ${item.owner}/${item.slug}`} onSelect={() => go(`/ledger/${item.owner}/${item.slug}`)}>
+                <CommandItem key={item.id} value={`ledger ${item.title} ${item.workspace}/${item.slug}`} onSelect={() => go(`/w/${item.workspace}/${item.slug}`)}>
                   <LayoutGridIcon className="text-muted-foreground" /> {item.title}
                   <span className="ml-auto text-xs text-muted-foreground">
-                    {item.owner}/{item.slug}
+                    {item.workspace}/{item.slug}
                   </span>
                 </CommandItem>
               ))}

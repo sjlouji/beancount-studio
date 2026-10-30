@@ -26,7 +26,7 @@ from app.ledgers.store import get_store
 from app.logging_setup import get_logger
 
 log = get_logger(__name__)
-router = APIRouter(prefix="/ledgers/{owner}/{slug}/chat", tags=["chat"])
+router = APIRouter(prefix="/workspaces/{workspace}/ledgers/{slug}/chat", tags=["chat"])
 
 
 class ThreadOut(BaseModel):

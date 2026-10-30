@@ -9,11 +9,7 @@ import { Input } from "@/components/ui/input";
 import { apiPost, errorMessage } from "@/lib/api/client";
 import { keys, useSystemInfo } from "@/lib/api/hooks";
 import type { User } from "@/lib/api/types";
-
-function safeNext(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/ledgers";
-  return value;
-}
+import { safeNext } from "@/lib/routes";
 
 function LoginForm() {
   const router = useRouter();
@@ -46,7 +42,7 @@ function LoginForm() {
       footer={
         info?.signupEnabled ? (
           <>
-            New here? <AuthLink href="/sign-up">Create an account</AuthLink>
+            New here? <AuthLink href={params.get("next") ? `/sign-up?next=${encodeURIComponent(safeNext(params.get("next")))}` : "/sign-up"}>Create an account</AuthLink>
           </>
         ) : undefined
       }
