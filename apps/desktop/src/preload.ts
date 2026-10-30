@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-import type { StudioDesktopBridge } from "@beancount-studio/desktop-bridge";
+import type { DesktopWorkspaceUpdate, StudioDesktopBridge } from "@beancount-studio/desktop-bridge";
 
-import type { ConnectChannel, ConnectResult, SignInCancelChannel, SignInReopenChannel } from "./ipc";
+import type { ConnectChannel, ConnectResult, SignInCancelChannel, SignInReopenChannel, WorkspacesChannel } from "./ipc";
 
 // This file runs sandboxed: only `electron` and a few Node built-ins can be required, so it
 // must not import local modules at runtime. Main passes the version as an argument because
@@ -10,6 +10,7 @@ import type { ConnectChannel, ConnectResult, SignInCancelChannel, SignInReopenCh
 const CONNECT_CHANNEL: ConnectChannel = "server:connect";
 const SIGN_IN_REOPEN_CHANNEL: SignInReopenChannel = "sign-in:reopen";
 const SIGN_IN_CANCEL_CHANNEL: SignInCancelChannel = "sign-in:cancel";
+const WORKSPACES_CHANNEL: WorkspacesChannel = "workspaces:update";
 
 const VERSION_ARG = "--studio-version=";
 const versionArg = process.argv.find((arg) => arg.startsWith(VERSION_ARG));
@@ -20,6 +21,8 @@ if (!versionArg) {
 const bridge: StudioDesktopBridge = {
   version: versionArg ? versionArg.slice(VERSION_ARG.length) : "unknown",
   platform: process.platform as StudioDesktopBridge["platform"],
+  // Main checks that the sender is the connected server and that the payload is well formed.
+  setWorkspaces: (update: DesktopWorkspaceUpdate): void => ipcRenderer.send(WORKSPACES_CHANNEL, update),
 };
 contextBridge.exposeInMainWorld("studioDesktop", bridge);
 

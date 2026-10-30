@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { challengeFor, createSignInChallenge, isAuthPage, parseSignedInDeepLink, signInUrl } from "./sign-in";
+import { authPageNext, challengeFor, createSignInChallenge, isAuthPage, parseSignedInDeepLink, signInUrl } from "./sign-in";
 
 describe("createSignInChallenge", () => {
   it("produces a random verifier and its sha256 hex", () => {
@@ -50,8 +50,21 @@ describe("isAuthPage", () => {
   });
 
   it("ignores other pages and other origins", () => {
-    assert.equal(isAuthPage(`${origin}/ledgers`, origin), false);
+    assert.equal(isAuthPage(`${origin}/w/ada/books`, origin), false);
     assert.equal(isAuthPage("https://evil.example/login", origin), false);
     assert.equal(isAuthPage("garbage", origin), false);
+  });
+});
+
+describe("authPageNext", () => {
+  it("returns the page the server wanted to show after signing in", () => {
+    assert.equal(authPageNext("https://s.example/login?next=%2Fw%2Fada%2Fbooks%3Ftime%3D2026"), "/w/ada/books?time=2026");
+  });
+
+  it("ignores missing, relative and scheme-relative targets", () => {
+    assert.equal(authPageNext("https://s.example/login"), null);
+    assert.equal(authPageNext("https://s.example/login?next=w%2Fada"), null);
+    assert.equal(authPageNext("https://s.example/login?next=%2F%2Fevil.example"), null);
+    assert.equal(authPageNext("garbage"), null);
   });
 });

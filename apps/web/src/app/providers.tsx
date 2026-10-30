@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { useState } from "react";
+import { DesktopSync } from "@/components/app/desktop-sync";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ApiError } from "@/lib/api/client";
@@ -28,6 +29,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
         <Toaster position="bottom-right" richColors closeButton />
+        <DesktopSync />
       </QueryClientProvider>
     </ThemeProvider>
   );

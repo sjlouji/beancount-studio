@@ -8,5 +8,7 @@
 export type ConnectChannel = "server:connect";
 export type SignInReopenChannel = "sign-in:reopen";
 export type SignInCancelChannel = "sign-in:cancel";
+/** Server pages send the person's workspaces (a DesktopWorkspaceUpdate) for the shell's menus. */
+export type WorkspacesChannel = "workspaces:update";
 
 export type ConnectResult = { ok: true } | { ok: false; error: string };
