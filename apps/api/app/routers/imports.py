@@ -16,7 +16,7 @@ from app.ledgers.store import get_store
 from app.logging_setup import get_logger
 
 log = get_logger(__name__)
-router = APIRouter(prefix="/ledgers/{owner}/{slug}/imports", tags=["imports"])
+router = APIRouter(prefix="/workspaces/{workspace}/ledgers/{slug}/imports", tags=["imports"])
 
 
 @router.post("/parse")
@@ -39,8 +39,8 @@ async def parse(
             raise ValidationError(f"Invalid column mapping: {exc}") from exc
     result = parse_statement(file.filename or "statement.csv", data, col_mapping)
     ledger = access.ledger
-    seen = await get_store().run(ledger.id, engine.transactions_for_dedup, ledger.main_file)
-    attrs = await get_store().run(ledger.id, engine.attributes, ledger.main_file)
+    seen = await get_store().run(ledger, engine.transactions_for_dedup)
+    attrs = await get_store().run(ledger, engine.attributes)
     result["existingKeys"] = [list(k) for k in seen]
     result["accounts"] = attrs["accounts"]
     result["currencies"] = attrs["currencies"]
@@ -70,8 +70,8 @@ async def categorize(body: CategorizeRequest, access: LedgerReadDep, settings: S
     from app.ai.categorize import suggest_categories
 
     ledger = access.ledger
-    history = await get_store().run(ledger.id, _payee_history, ledger.main_file)
-    attrs = await get_store().run(ledger.id, engine.attributes, ledger.main_file)
+    history = await get_store().run(ledger, _payee_history)
+    attrs = await get_store().run(ledger, engine.attributes)
     suggestions = await suggest_categories(
         settings,
         rows=[r.model_dump() for r in body.rows],
@@ -126,10 +126,10 @@ class CommitRequest(BaseModel):
 async def commit(body: CommitRequest, access: LedgerWriteDep):
     store = get_store()
     ledger = access.ledger
-    seen = await store.run(ledger.id, engine.transactions_for_dedup, ledger.main_file)
-    meta = await store.run(ledger.id, engine.ledger_meta, ledger.main_file)
+    seen = await store.run(ledger, engine.transactions_for_dedup)
+    meta = await store.run(ledger, engine.ledger_meta)
     currency_column = meta["favaOptions"]["currencyColumn"]
-    target_file = body.filename or await store.run(ledger.id, engine.default_file, ledger.main_file)
+    target_file = body.filename or await store.run(ledger, engine.default_file)
 
     rendered: list[str] = []
     skipped: list[int] = []
@@ -161,16 +161,16 @@ async def commit(body: CommitRequest, access: LedgerWriteDep):
         seen.add(key)
     if not rendered:
         return {"written": 0, "skipped": skipped, "commit": None, "errors": []}
-    async with store.write_lock(ledger.id):
-        current, _sha = store.read_file(ledger.id, target_file)
+    async with store.write_lock(ledger):
+        current, _sha = store.read_file(ledger, target_file)
         separator = "" if current.endswith("\n\n") else ("\n" if current.endswith("\n") else "\n\n")
-        store.write_file(ledger.id, target_file, current + separator + "\n".join(rendered))
+        store.write_file(ledger, target_file, current + separator + "\n".join(rendered))
         sha = await store.commit(
-            ledger.id,
+            ledger,
             body.message or f"Import {len(rendered)} transactions into {body.source_account}",
             author_for(access.auth.user),
         )
-        errors = await store.run(ledger.id, engine.errors, ledger.main_file)
+        errors = await store.run(ledger, engine.errors)
     log.info(
         "imported %d transactions into ledger %s (%d duplicates skipped)",
         len(rendered),

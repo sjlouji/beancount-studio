@@ -10,6 +10,28 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 USERNAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])?$")
 SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$")
+# Same shape as a username, so a person's name can double as their workspace address.
+WORKSPACE_SLUG_RE = USERNAME_RE
+# The web client serves workspace pages at /w/<workspace>/<name>; a ledger cannot sit there.
+RESERVED_LEDGER_SLUGS = frozenset({"settings", "new", "members", "invites", "activity", "search"})
+FISCAL_YEAR_END_RE = re.compile(r"^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$")
+
+
+def valid_workspace_slug(value: str) -> bool:
+    return len(value) >= 3 and WORKSPACE_SLUG_RE.match(value) is not None
+
+
+def ledger_slug_error(value: str) -> str | None:
+    """Why `value` cannot be a ledger slug, or None when it can."""
+    if not SLUG_RE.match(value):
+        return "Slug must be lowercase letters, digits or hyphens"
+    if value in RESERVED_LEDGER_SLUGS:
+        return f"'{value}' is the address of a workspace page; choose another slug"
+    return None
+
+
+def slugify(value: str, max_length: int = 80) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:max_length].strip("-")
 
 
 class ApiModel(BaseModel):
@@ -22,7 +44,6 @@ class SignUpRequest(BaseModel):
     username: str = Field(min_length=3, max_length=40)
     password: str = Field(min_length=8, max_length=200)
     display_name: str = Field(default="", max_length=120, alias="displayName")
-    create_example_ledger: bool = Field(default=True, alias="createExampleLedger")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -117,6 +138,100 @@ class DeleteAccountRequest(BaseModel):
     password: str
 
 
+# ------------------------------------------------------------------ workspaces
+WorkspaceRoleName = Literal["owner", "admin", "member", "viewer"]
+
+
+def _workspace_slug(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip().lower()
+    if not valid_workspace_slug(value):
+        raise ValueError("Use 3-40 lowercase letters, digits or hyphens")
+    return value
+
+
+class WorkspaceCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    slug: str | None = Field(default=None, max_length=40)
+
+    @field_validator("slug")
+    @classmethod
+    def _slug(cls, value: str | None) -> str | None:
+        return _workspace_slug(value)
+
+
+class WorkspaceUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    slug: str | None = Field(default=None, max_length=40)
+
+    @field_validator("slug")
+    @classmethod
+    def _slug(cls, value: str | None) -> str | None:
+        return _workspace_slug(value)
+
+
+class WorkspaceOut(BaseModel):
+    id: str
+    slug: str
+    name: str
+    role: str
+    members_count: int = Field(alias="membersCount")
+    ledgers_count: int = Field(alias="ledgersCount")
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class MemberOut(BaseModel):
+    username: str
+    display_name: str = Field(alias="displayName")
+    role: str
+    joined_at: datetime = Field(alias="joinedAt")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class MemberRoleRequest(BaseModel):
+    role: WorkspaceRoleName
+
+
+class InviteCreateRequest(BaseModel):
+    role: Literal["admin", "member", "viewer"] = "member"
+    expires_in_days: int = Field(default=7, ge=1, le=90, alias="expiresInDays")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class InviteOut(BaseModel):
+    id: str
+    role: str
+    uses: int
+    created_by: str | None = Field(alias="createdBy")
+    expires_at: datetime = Field(alias="expiresAt")
+    created_at: datetime = Field(alias="createdAt")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class MintedInviteOut(InviteOut):
+    """The link is shown once; only its hash is kept."""
+
+    url: str
+
+
+class InvitePreviewOut(BaseModel):
+    workspace_slug: str = Field(alias="workspaceSlug")
+    workspace_name: str = Field(alias="workspaceName")
+    role: str
+    invited_by: str | None = Field(alias="invitedBy")
+    expires_at: datetime = Field(alias="expiresAt")
+    already_member: bool = Field(alias="alreadyMember")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
 # --------------------------------------------------------------------- ledgers
 class RemoteConnectRequest(BaseModel):
     """A repository to connect to: where it is and how Studio may reach it."""
@@ -139,8 +254,12 @@ class LedgerCreateRequest(BaseModel):
     visibility: Literal["private", "public"] = "private"
     template: Literal["blank", "starter", "example"] = "starter"
     currency: str = Field(default="USD", min_length=1, max_length=24)
+    # MM-DD, written as Fava's fiscal-year-end option; unset means the calendar year.
+    fiscal_year_end: str | None = Field(default=None, alias="fiscalYearEnd", max_length=5)
     # When set, the ledger is cloned from this repository instead of created from a template.
     source: LedgerSourceRequest | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
     @field_validator("currency")
     @classmethod
@@ -148,6 +267,15 @@ class LedgerCreateRequest(BaseModel):
         value = value.strip().upper()
         if not re.match(r"^[A-Z][A-Z0-9'._-]{0,23}$", value):
             raise ValueError("Invalid currency code")
+        return value
+
+    @field_validator("fiscal_year_end")
+    @classmethod
+    def _fiscal_year_end(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not FISCAL_YEAR_END_RE.match(value):
+            raise ValueError("Fiscal year end must be MM-DD, for example 06-30")
         return value
 
 
@@ -194,7 +322,7 @@ class GitTestOut(BaseModel):
 
 class LedgerOut(BaseModel):
     id: str
-    owner: str
+    workspace: str
     slug: str
     title: str
     description: str
@@ -208,19 +336,6 @@ class LedgerOut(BaseModel):
     updated_at: datetime = Field(alias="updatedAt")
     last_commit: dict[str, Any] | None = Field(default=None, alias="lastCommit")
     remote: RemoteOut | None = None
-
-    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
-
-
-class CollaboratorUpsertRequest(BaseModel):
-    role: Literal["read", "write", "admin"] = "read"
-
-
-class CollaboratorOut(BaseModel):
-    username: str
-    display_name: str = Field(alias="displayName")
-    role: str
-    created_at: datetime = Field(alias="createdAt")
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 

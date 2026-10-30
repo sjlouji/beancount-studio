@@ -18,17 +18,17 @@ import type { ChatThread } from "@/lib/api/types";
 import { formatRelative } from "@/lib/format";
 
 function PanelBody() {
-  const { owner, slug, base, ask, setAskThread, closeAsk } = useLedgerContext();
+  const { workspace, slug, base, ask, setAskThread, closeAsk } = useLedgerContext();
   const qc = useQueryClient();
   const { data: me } = useMe();
   const { data: info } = useSystemInfo();
   const aiReady = Boolean(info?.aiEnabled) && Boolean(me);
-  const threads = useChatThreads(owner, slug, aiReady);
-  const thread = useChatThread(owner, slug, ask.threadId);
-  const threadsKey = keys.ledgerScope(owner, slug, "chat-threads");
+  const threads = useChatThreads(workspace, slug, aiReady);
+  const thread = useChatThread(workspace, slug, ask.threadId);
+  const threadsKey = keys.ledgerScope(workspace, slug, "chat-threads");
 
   const create = useMutation({
-    mutationFn: () => apiPost<ChatThread>(`${ledgerPath(owner, slug)}/chat/threads`),
+    mutationFn: () => apiPost<ChatThread>(`${ledgerPath(workspace, slug)}/chat/threads`),
     onSuccess: (created) => {
       void qc.invalidateQueries({ queryKey: threadsKey });
       setAskThread(created.id);

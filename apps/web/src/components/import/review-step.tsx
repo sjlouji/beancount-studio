@@ -32,7 +32,7 @@ export function ReviewStep({
   onBack: () => void;
   onContinue: () => void;
 }) {
-  const { owner, slug } = useLedgerContext();
+  const { workspace, slug } = useLedgerContext();
   const { statement, rows, sourceAccount, currency } = state;
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkAccount, setBulkAccount] = useState("");
@@ -59,7 +59,7 @@ export function ReviewStep({
 
   const categorize = useMutation({
     mutationFn: () =>
-      apiPost<{ suggestions: CategorySuggestion[] }>(`${ledgerPath(owner, slug)}/imports/categorize`, {
+      apiPost<{ suggestions: CategorySuggestion[] }>(`${ledgerPath(workspace, slug)}/imports/categorize`, {
         rows: rows.map((r) => ({ id: r.id, date: r.date || null, payee: r.payee, description: r.narration, amount: r.amount || null })),
         sourceAccount: sourceAccount || null,
         useAi: aiEnabled,

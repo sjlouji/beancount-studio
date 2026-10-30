@@ -96,6 +96,17 @@ async def _remote(ledger_id: str) -> LedgerRemote:
         return row
 
 
+async def _repo_dir(ledger_id: str) -> Path:
+    async with get_session_factory()() as db:
+        row = await db.get(Ledger, ledger_id)
+        assert row is not None
+        return get_store().paths(row).repo
+
+
+def _base(ledger: dict) -> str:
+    return f"/api/workspaces/{ledger['workspace']}/ledgers/{ledger['slug']}"
+
+
 async def _connect(ledger: dict, user: dict, bare: Path) -> None:
     sync = get_remote_sync()
     async with get_session_factory()() as db:
@@ -169,7 +180,7 @@ async def test_server_paths_are_for_administrators_outside_the_data_dir(
     row, owner = await _rows(ledger, admin)
     assert owner.is_admin
     sync.check_source(parse_source(str(seed_repo)), "none", owner)
-    inside = get_store().paths(ledger["id"]).repo
+    inside = get_store().paths(row).repo
     with pytest.raises(ForbiddenError):
         sync.check_source(parse_source(str(inside)), "none", owner)
     with pytest.raises(ValidationError):
@@ -197,19 +208,21 @@ async def test_server_paths_are_for_administrators_outside_the_data_dir(
 
 
 async def test_clone_brings_history_and_detects_the_main_file(
-    client: AsyncClient, admin: dict, seed_repo: Path
+    client: AsyncClient, admin: dict, workspace: dict, seed_repo: Path
 ):
     sync = get_remote_sync()
     async with get_session_factory()() as db:
         owner = await db.get(User, admin["id"])
-        row = Ledger(owner_id=owner.id, slug="imported", title="Imported")
+        row = Ledger(
+            workspace_id=workspace["id"], slug="imported", title="Imported", main_file="main.bean"
+        )
         db.add(row)
         await db.flush()
         main_file = await sync.clone(db, row, owner, parse_source(str(seed_repo)), "none")
         row.main_file = main_file
         await db.commit()
     assert main_file == "main.bean"
-    repo = get_store().paths(row.id).repo
+    repo = get_store().paths(row).repo
     assert head(repo) == head(seed_repo)
     assert git("rev-list", "--count", "HEAD", cwd=repo) == "2"
     remote = await _remote(row.id)
@@ -219,7 +232,7 @@ async def test_clone_brings_history_and_detects_the_main_file(
         "trunk",
         "in_sync",
     )
-    served = await client.get(f"/api/ledgers/{admin['username']}/imported")
+    served = await client.get(f"/api/workspaces/{workspace['slug']}/ledgers/imported")
     assert served.status_code == 200, served.text
     assert served.json()["lastCommit"]["subject"] == "Second"
 
@@ -228,11 +241,11 @@ async def test_every_write_is_pushed_to_the_remote(
     client: AsyncClient, admin: dict, ledger: dict, bare: Path
 ):
     await _connect(ledger, admin, bare)
-    repo = get_store().paths(ledger["id"]).repo
+    repo = await _repo_dir(ledger["id"])
     assert head(bare) == head(repo), "connecting pushes the existing history"
 
     res = await client.put(
-        f"/api/ledgers/{ledger['owner']}/{ledger['slug']}/files/content",
+        f"{_base(ledger)}/files/content",
         json={"path": "notes.md", "content": "pushed\n"},
     )
     assert res.status_code == 200, res.text
@@ -258,7 +271,7 @@ async def test_sync_pulls_commits_made_elsewhere(
     async with get_session_factory()() as db:
         row = await db.get(Ledger, ledger["id"])
         remote = await sync.sync(db, row)
-    repo = get_store().paths(ledger["id"]).repo
+    repo = await _repo_dir(ledger["id"])
     assert remote.state == "in_sync", remote.last_error
     assert head(repo) == head(bare) == head(work)
     assert (repo / "extra.bean").exists()
@@ -268,7 +281,7 @@ async def test_sync_stops_on_conflicting_changes(
     client: AsyncClient, admin: dict, ledger: dict, bare: Path, tmp_path: Path
 ):
     await _connect(ledger, admin, bare)
-    base = f"/api/ledgers/{ledger['owner']}/{ledger['slug']}"
+    base = _base(ledger)
     work = tmp_path / "work"
     git("clone", "-q", str(bare), str(work), cwd=tmp_path)
     (work / "README.md").write_text("# Changed on another machine\n")
@@ -281,7 +294,7 @@ async def test_sync_stops_on_conflicting_changes(
     assert res.status_code == 200, res.text
     sync = get_remote_sync()
     await sync.drain()
-    repo = get_store().paths(ledger["id"]).repo
+    repo = await _repo_dir(ledger["id"])
     local_head = head(repo)
     remote = await _remote(ledger["id"])
     assert remote.state == "behind", remote.last_error
@@ -307,10 +320,11 @@ async def test_sync_stops_on_conflicting_changes(
 
 
 async def test_create_ledger_from_a_server_path_through_the_api(
-    client: AsyncClient, admin: dict, seed_repo: Path
+    client: AsyncClient, admin: dict, workspace: dict, seed_repo: Path
 ):
+    ledgers = f"/api/workspaces/{workspace['slug']}/ledgers"
     res = await client.post(
-        "/api/ledgers", json={"title": "Imported books", "source": {"url": str(seed_repo)}}
+        ledgers, json={"title": "Imported books", "source": {"url": str(seed_repo)}}
     )
     assert res.status_code == 201, res.text
     body = res.json()
@@ -319,14 +333,14 @@ async def test_create_ledger_from_a_server_path_through_the_api(
     assert body["remote"]["auth"] == "none"
     assert body["remote"]["branch"] == "trunk"
     assert body["remote"]["state"] == "in_sync"
-    meta = await client.get(f"/api/ledgers/{admin['username']}/imported-books/meta")
+    meta = await client.get(f"{ledgers}/imported-books/meta")
     assert meta.status_code == 200, meta.text
     listing = await client.get("/api/ledgers")
     assert any(item["remote"] for item in listing.json())
 
 
 async def test_create_asks_which_file_is_the_main_ledger(
-    client: AsyncClient, admin: dict, tmp_path: Path
+    client: AsyncClient, admin: dict, workspace: dict, tmp_path: Path
 ):
     path = tmp_path / "two"
     path.mkdir()
@@ -336,25 +350,26 @@ async def test_create_asks_which_file_is_the_main_ledger(
     git("add", "-A", cwd=path)
     git("commit", "-q", "-m", "Two files", cwd=path)
 
-    res = await client.post("/api/ledgers", json={"title": "Two", "source": {"url": str(path)}})
+    ledgers = f"/api/workspaces/{workspace['slug']}/ledgers"
+    res = await client.post(ledgers, json={"title": "Two", "source": {"url": str(path)}})
     assert res.status_code == 409, res.text
     assert res.json()["error"]["code"] == "main_file_required"
     assert res.json()["error"]["details"]["candidates"] == ["archive.bean", "books.bean"]
-    assert (await client.get(f"/api/ledgers/{admin['username']}/two")).status_code == 404
+    assert (await client.get(f"{ledgers}/two")).status_code == 404
 
     res = await client.post(
-        "/api/ledgers",
+        ledgers,
         json={"title": "Two", "source": {"url": str(path), "mainFile": "books.bean"}},
     )
     assert res.status_code == 201, res.text
-    meta = await client.get(f"/api/ledgers/{admin['username']}/two/meta")
+    meta = await client.get(f"{ledgers}/two/meta")
     assert meta.status_code == 200, meta.text
 
 
 async def test_remote_endpoints_connect_sync_disconnect(
     client: AsyncClient, admin: dict, ledger: dict, bare: Path
 ):
-    base = f"/api/ledgers/{ledger['owner']}/{ledger['slug']}"
+    base = _base(ledger)
     res = await client.put(f"{base}/remote", json={"url": str(bare), "auth": "none"})
     assert res.status_code == 200, res.text
     assert res.json()["state"] == "pushing"
@@ -362,7 +377,7 @@ async def test_remote_endpoints_connect_sync_disconnect(
 
     shown = await client.get(base)
     assert shown.json()["remote"]["state"] == "in_sync"
-    assert shown.json()["remote"]["lastPushedSha"] == head(get_store().paths(ledger["id"]).repo)
+    assert shown.json()["remote"]["lastPushedSha"] == head(await _repo_dir(ledger["id"]))
 
     synced = await client.post(f"{base}/remote/sync")
     assert synced.status_code == 200, synced.text
@@ -377,7 +392,7 @@ async def test_remote_endpoints_connect_sync_disconnect(
 async def test_connecting_needs_admin_role_and_sync_needs_write(
     client: AsyncClient, admin: dict, ledger: dict, bare: Path
 ):
-    base = f"/api/ledgers/{ledger['owner']}/{ledger['slug']}"
+    base = _base(ledger)
     assert (
         await client.put(f"{base}/remote", json={"url": str(bare), "auth": "none"})
     ).status_code == 200
@@ -393,21 +408,25 @@ async def test_connecting_needs_admin_role_and_sync_needs_write(
         },
     )
     assert res.status_code == 201, res.text
-    # Signing up switched the session to the new account; the owner grants write access.
+    # Signing up switched the session to the new account; the owner invites them as a member.
     assert (
         await client.post(
             "/api/auth/login",
             json={"identifier": admin["username"], "password": "correct-horse-battery"},
         )
     ).status_code == 200
-    granted = await client.put(f"{base}/collaborators/{name}", json={"role": "write"})
-    assert granted.status_code == 200, granted.text
+    invited = await client.post(
+        f"/api/workspaces/{ledger['workspace']}/invites", json={"role": "member"}
+    )
+    assert invited.status_code == 201, invited.text
+    token = invited.json()["url"].rsplit("/", 1)[1]
 
     assert (
         await client.post(
             "/api/auth/login", json={"identifier": name, "password": "correct-horse-battery"}
         )
     ).status_code == 200
+    assert (await client.post(f"/api/invites/{token}/accept")).status_code == 200
     forbidden = await client.put(f"{base}/remote", json={"url": str(bare), "auth": "none"})
     assert forbidden.status_code == 403
     assert (await client.delete(f"{base}/remote")).status_code == 403
@@ -434,7 +453,7 @@ async def _diverge(client: AsyncClient, ledger: dict, bare: Path, work: Path, ma
     git("commit", "-q", "-am", f"Readme elsewhere {marker}", cwd=work)
     git("push", "-q", "origin", "main", cwd=work)
     res = await client.put(
-        f"/api/ledgers/{ledger['owner']}/{ledger['slug']}/files/content",
+        f"{_base(ledger)}/files/content",
         json={"path": "README.md", "content": f"# Studio {marker}\n"},
     )
     assert res.status_code == 200, res.text
@@ -444,11 +463,11 @@ async def _diverge(client: AsyncClient, ledger: dict, bare: Path, work: Path, ma
 async def test_resolve_keeps_the_side_you_choose(
     client: AsyncClient, admin: dict, ledger: dict, bare: Path, tmp_path: Path
 ):
-    base = f"/api/ledgers/{ledger['owner']}/{ledger['slug']}"
+    base = _base(ledger)
     await _connect(ledger, admin, bare)
     work = tmp_path / "work"
     git("clone", "-q", str(bare), str(work), cwd=tmp_path)
-    repo = get_store().paths(ledger["id"]).repo
+    repo = await _repo_dir(ledger["id"])
 
     await _diverge(client, ledger, bare, work, "one")
     assert (await client.post(f"{base}/remote/sync")).json()["state"] == "diverged"
@@ -498,7 +517,11 @@ async def test_ssh_key_lifecycle(client: AsyncClient, user: dict, ledger: dict):
         # A ledger that pushes with this key pins it.
         owned = await db.get(Ledger, ledger["id"])
         owned.remote = LedgerRemote(
-            url="git@github.com:someone/books.git", transport="ssh", auth="ssh_key", branch="main"
+            url="git@github.com:someone/books.git",
+            transport="ssh",
+            auth="ssh_key",
+            ssh_user_id=user["id"],
+            branch="main",
         )
         await db.commit()
     refused = await client.delete("/api/users/me/ssh-key")
@@ -540,7 +563,7 @@ async def test_ssh_key_exists_on_disk_only_during_a_git_call():
 async def test_read_only_viewers_do_not_see_remote_details(
     client: AsyncClient, admin: dict, ledger: dict, bare: Path
 ):
-    base = f"/api/ledgers/{ledger['owner']}/{ledger['slug']}"
+    base = _base(ledger)
     await _connect(ledger, admin, bare)
     assert (await client.patch(base, json={"visibility": "public"})).status_code == 200
     assert (await client.get(base)).json()["remote"]["url"] == str(bare)
@@ -550,38 +573,31 @@ async def test_read_only_viewers_do_not_see_remote_details(
     assert anonymous.json()["remote"] is None
 
 
-async def test_only_the_owner_connects_an_ssh_remote(
+async def test_ssh_remotes_push_with_the_key_of_whoever_connected_them(
     client: AsyncClient, admin: dict, ledger: dict
 ):
-    base = f"/api/ledgers/{ledger['owner']}/{ledger['slug']}"
-    name = f"coadmin{uuid.uuid4().hex[:8]}"
-    res = await client.post(
-        "/api/auth/sign-up",
-        json={
-            "email": f"{name}@example.com",
-            "username": name,
-            "password": "correct-horse-battery",
-        },
-    )
-    assert res.status_code == 201, res.text
-    assert (
-        await client.post(
-            "/api/auth/login",
-            json={"identifier": admin["username"], "password": "correct-horse-battery"},
-        )
-    ).status_code == 200
-    assert (
-        await client.put(f"{base}/collaborators/{name}", json={"role": "admin"})
-    ).status_code == 200
-    assert (
-        await client.post(
-            "/api/auth/login", json={"identifier": name, "password": "correct-horse-battery"}
-        )
-    ).status_code == 200
+    base = _base(ledger)
+    # Without a key of their own, an admin cannot connect an SSH remote at all.
     res = await client.put(
         f"{base}/remote", json={"url": "git@github.com:someone/books.git", "auth": "ssh_key"}
     )
-    assert res.status_code == 403, res.text
+    assert res.status_code == 422, res.text
+    assert "SSH key" in res.json()["error"]["message"]
+
+    # A stored remote whose key owner is gone cannot push until someone reconnects it.
+    sync = get_remote_sync()
+    async with get_session_factory()() as db:
+        row = await db.get(Ledger, ledger["id"])
+        row.remote = LedgerRemote(
+            url="git@github.com:someone/books.git",
+            transport="ssh",
+            auth="ssh_key",
+            ssh_user_id=None,
+            branch="main",
+        )
+        await db.commit()
+        with pytest.raises(ValidationError, match="reconnect"):
+            await sync._credentials(db, row.remote)
 
 
 async def test_restart_turns_interrupted_pushes_into_errors(
@@ -599,7 +615,7 @@ async def test_restart_turns_interrupted_pushes_into_errors(
 
 
 async def test_a_write_before_any_read_uses_the_cloned_main_file(
-    client: AsyncClient, admin: dict, tmp_path: Path
+    client: AsyncClient, admin: dict, workspace: dict, tmp_path: Path
 ):
     path = tmp_path / "named"
     path.mkdir()
@@ -609,10 +625,13 @@ async def test_a_write_before_any_read_uses_the_cloned_main_file(
     )
     git("add", "-A", cwd=path)
     git("commit", "-q", "-m", "Books", cwd=path)
-    res = await client.post("/api/ledgers", json={"title": "Named", "source": {"url": str(path)}})
+    res = await client.post(
+        f"/api/workspaces/{workspace['slug']}/ledgers",
+        json={"title": "Named", "source": {"url": str(path)}},
+    )
     assert res.status_code == 201, res.text
     ledger_id = res.json()["id"]
-    base = f"/api/ledgers/{admin['username']}/named"
+    base = _base(res.json())
 
     get_store().evict(ledger_id)  # as after a restart: the first thing that happens is a write
     written = await client.put(

@@ -51,10 +51,9 @@ function ProfileForm({ me }: { me: User }) {
     try {
       const user = await update.mutateAsync(patch);
       setForm(fieldsOf(user));
-      // Profiles and ledger owners are keyed by username, so cached copies are stale after a rename.
+      // Profiles are keyed by username, so cached copies are stale after a rename.
       if (patch.username) {
         void qc.invalidateQueries({ queryKey: ["profile"] });
-        void qc.invalidateQueries({ queryKey: ["ledgers"] });
       }
       toast.success("Profile updated");
     } catch (err) {
@@ -88,7 +87,7 @@ function ProfileForm({ me }: { me: User }) {
               <FieldError>Use 3-40 lowercase letters, digits or hyphens, starting and ending with a letter or digit.</FieldError>
             ) : (
               <FieldDescription>
-                Lowercase letters, digits and hyphens. Your ledgers live at /ledger/<span className="font-mono">{form.username}</span>/…
+                Lowercase letters, digits and hyphens.
               </FieldDescription>
             )}
           </Field>

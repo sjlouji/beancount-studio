@@ -9,7 +9,7 @@ from app.errors import NotFoundError
 from app.ledgers.remotes import get_remote_sync, parse_source
 from app.schemas import GitTestOut, RemoteConnectRequest, RemoteOut, RemoteResolveRequest
 
-router = APIRouter(prefix="/ledgers/{owner}/{slug}/remote", tags=["remotes"])
+router = APIRouter(prefix="/workspaces/{workspace}/ledgers/{slug}/remote", tags=["remotes"])
 git_router = APIRouter(prefix="/git", tags=["remotes"])
 
 

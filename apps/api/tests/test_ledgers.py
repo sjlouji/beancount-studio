@@ -3,9 +3,15 @@ from __future__ import annotations
 from httpx import AsyncClient
 
 
-async def test_ledger_lifecycle_and_reports(client: AsyncClient, user: dict, ledger: dict):
-    owner, slug = ledger["owner"], ledger["slug"]
-    base = f"/api/ledgers/{owner}/{slug}"
+def _base(ledger: dict) -> str:
+    return f"/api/workspaces/{ledger['workspace']}/ledgers/{ledger['slug']}"
+
+
+async def test_ledger_lifecycle_and_reports(
+    client: AsyncClient, user: dict, workspace: dict, ledger: dict
+):
+    base = _base(ledger)
+    assert ledger["workspace"] == workspace["slug"]
     assert ledger["role"] == "owner" and ledger["canWrite"]
     assert ledger["lastCommit"]["subject"] == "Create ledger"
 
@@ -58,6 +64,12 @@ async def test_ledger_lifecycle_and_reports(client: AsyncClient, user: dict, led
         res = await client.get(f"{base}/{page}")
         assert res.status_code == 200, (page, res.text)
 
+    # The workspace listing and the cross-workspace listing both carry the ledger.
+    in_workspace = await client.get(f"/api/workspaces/{workspace['slug']}/ledgers")
+    assert [item["id"] for item in in_workspace.json()] == [ledger["id"]]
+    mine = await client.get("/api/ledgers")
+    assert any(item["id"] == ledger["id"] for item in mine.json())
+
     # Visibility: anonymous cannot see a private ledger; public ledgers are readable.
     anon = AsyncClient(transport=client._transport, base_url="http://test")
     assert (await anon.get(f"{base}/meta")).status_code == 401
@@ -68,12 +80,11 @@ async def test_ledger_lifecycle_and_reports(client: AsyncClient, user: dict, led
         await anon.put(f"{base}/files/content", json={"path": "main.bean", "content": "x"})
     ).status_code == 401
     gallery = await anon.get("/api/ledgers/gallery")
-    assert any(item["slug"] == slug for item in gallery.json())
+    assert any(item["id"] == ledger["id"] for item in gallery.json())
 
 
 async def test_entry_edit_and_history(client: AsyncClient, user: dict, ledger: dict):
-    owner, slug = ledger["owner"], ledger["slug"]
-    base = f"/api/ledgers/{owner}/{slug}"
+    base = _base(ledger)
 
     added = await client.post(
         f"{base}/entries",
@@ -124,8 +135,7 @@ async def test_entry_edit_and_history(client: AsyncClient, user: dict, ledger: d
 
 
 async def test_files_check_and_write(client: AsyncClient, user: dict, ledger: dict):
-    owner, slug = ledger["owner"], ledger["slug"]
-    base = f"/api/ledgers/{owner}/{slug}"
+    base = _base(ledger)
     tree = await client.get(f"{base}/files/tree")
     assert tree.status_code == 200
     assert {e["name"] for e in tree.json()["entries"]} >= {"main.bean", "README.md"}
@@ -164,41 +174,82 @@ async def test_files_check_and_write(client: AsyncClient, user: dict, ledger: di
     ).status_code == 422
 
 
-async def test_collaborators(client: AsyncClient, user: dict, ledger: dict):
-    owner, slug = ledger["owner"], ledger["slug"]
-    base = f"/api/ledgers/{owner}/{slug}"
-    other = AsyncClient(transport=client._transport, base_url="http://test")
-    res = await other.post(
-        "/api/auth/sign-up",
-        json={
-            "email": "bob@example.com",
-            "username": "bob",
-            "password": "correct-horse-battery",
-            "createExampleLedger": False,
-        },
+async def test_slugs_are_unique_per_workspace(client: AsyncClient, user: dict, workspace: dict):
+    first = await client.post(
+        f"/api/workspaces/{workspace['slug']}/ledgers", json={"title": "Books", "template": "blank"}
     )
-    assert res.status_code == 201
-    assert (await other.get(f"{base}/meta")).status_code == 404
+    assert first.status_code == 201, first.text
+    assert first.json()["slug"] == "books"
+    clash = await client.post(
+        f"/api/workspaces/{workspace['slug']}/ledgers", json={"title": "Books", "template": "blank"}
+    )
+    assert clash.status_code == 409
 
-    added = await client.put(f"{base}/collaborators/bob", json={"role": "read"})
-    assert added.status_code == 200
-    assert (await other.get(f"{base}/meta")).status_code == 200
-    assert (
-        await other.post(f"{base}/files", json={"path": "x.bean", "content": ""})
-    ).status_code == 403
-    mine = await other.get("/api/ledgers")
-    assert any(item["slug"] == slug and item["role"] == "read" for item in mine.json())
+    other = await client.post(
+        "/api/workspaces", json={"name": "Second", "slug": f"{workspace['slug']}b"}
+    )
+    assert other.status_code == 201, other.text
+    same_slug_elsewhere = await client.post(
+        f"/api/workspaces/{other.json()['slug']}/ledgers",
+        json={"title": "Books", "template": "blank"},
+    )
+    assert same_slug_elsewhere.status_code == 201, same_slug_elsewhere.text
 
-    await client.put(f"{base}/collaborators/bob", json={"role": "write"})
-    assert (
-        await other.post(f"{base}/files", json={"path": "x.bean", "content": ""})
-    ).status_code == 201
-    assert (await other.delete(base)).status_code == 403
-
-    removed = await client.delete(f"{base}/collaborators/bob")
-    assert removed.status_code == 204
-    assert (await other.get(f"{base}/meta")).status_code == 404
-
-    gone = await client.delete(base)
+    gone = await client.delete(f"/api/workspaces/{workspace['slug']}/ledgers/books")
     assert gone.status_code == 204
-    assert (await client.get(base)).status_code == 404
+    assert (
+        await client.get(f"/api/workspaces/{workspace['slug']}/ledgers/books")
+    ).status_code == 404
+
+
+async def test_workspace_page_addresses_are_not_ledger_slugs(
+    client: AsyncClient, user: dict, workspace: dict, ledger: dict
+):
+    ledgers = f"/api/workspaces/{workspace['slug']}/ledgers"
+    taken = await client.post(ledgers, json={"title": "Settings", "template": "blank"})
+    assert taken.status_code == 422, taken.text
+    assert "workspace page" in taken.json()["error"]["message"]
+    assert (await client.patch(_base(ledger), json={"slug": "new"})).status_code == 422
+
+
+async def test_fiscal_year_end_is_written_into_the_ledger(
+    client: AsyncClient, user: dict, workspace: dict
+):
+    ledgers = f"/api/workspaces/{workspace['slug']}/ledgers"
+    bad = await client.post(ledgers, json={"title": "Books", "fiscalYearEnd": "13-01"})
+    assert bad.status_code == 422
+    res = await client.post(
+        ledgers, json={"title": "Books", "template": "blank", "fiscalYearEnd": "06-30"}
+    )
+    assert res.status_code == 201, res.text
+    meta = await client.get(f"{_base(res.json())}/meta")
+    assert meta.status_code == 200, meta.text
+    assert meta.json()["favaOptions"]["fiscalYearEnd"] == {"month": 6, "day": 30}
+    assert meta.json()["errorsCount"] == 0
+
+
+async def test_activity_can_be_scoped_to_a_workspace(
+    client: AsyncClient, user: dict, workspace: dict, ledger: dict
+):
+    other = await client.post(
+        "/api/workspaces", json={"name": "Elsewhere", "slug": f"{workspace['slug']}c"}
+    )
+    assert other.status_code == 201, other.text
+    elsewhere = await client.post(
+        f"/api/workspaces/{other.json()['slug']}/ledgers",
+        json={"title": "Far", "template": "blank"},
+    )
+    assert elsewhere.status_code == 201, elsewhere.text
+
+    everything = (await client.get("/api/ledgers/activity")).json()
+    assert {item["ledger"]["workspace"] for item in everything["items"]} == {
+        workspace["slug"],
+        other.json()["slug"],
+    }
+    scoped = (
+        await client.get("/api/ledgers/activity", params={"workspace": workspace["slug"]})
+    ).json()
+    assert {item["ledger"]["workspace"] for item in scoped["items"]} == {workspace["slug"]}
+    assert (await client.get("/api/ledgers/activity", params={"workspace": "nope"})).json()[
+        "items"
+    ] == []

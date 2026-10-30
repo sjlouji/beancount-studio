@@ -12,7 +12,7 @@ export default function NotFound() {
         <p className="mt-2 type-body text-muted-foreground">The address is wrong, or the ledger it belongs to is private.</p>
       </div>
       <Button asChild size="lg">
-        <Link href="/ledgers">Back to ledgers</Link>
+        <Link href="/">Back to home</Link>
       </Button>
     </div>
   );

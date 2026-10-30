@@ -13,6 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { apiDelete, errorMessage } from "@/lib/api/client";
 import { keys, ledgerPath } from "@/lib/api/hooks";
 import type { Ledger } from "@/lib/api/types";
+import { workspaceHref } from "@/lib/routes";
 
 export function DangerZone({ ledger }: { ledger: Ledger }) {
   const qc = useQueryClient();
@@ -21,13 +22,15 @@ export function DangerZone({ ledger }: { ledger: Ledger }) {
   const [typed, setTyped] = useState("");
 
   const remove = useMutation({
-    mutationFn: () => apiDelete<void>(ledgerPath(ledger.owner, ledger.slug)),
+    mutationFn: () => apiDelete<void>(ledgerPath(ledger.workspace, ledger.slug)),
     onSuccess: () => {
       toast.success(`Deleted ${ledger.title}`);
       setOpen(false);
-      qc.removeQueries({ queryKey: keys.ledger(ledger.owner, ledger.slug) });
+      qc.removeQueries({ queryKey: keys.ledger(ledger.workspace, ledger.slug) });
       void qc.invalidateQueries({ queryKey: keys.ledgers });
-      router.push("/ledgers");
+      void qc.invalidateQueries({ queryKey: keys.workspaceScope(ledger.workspace) });
+      void qc.invalidateQueries({ queryKey: keys.workspaces });
+      router.push(workspaceHref(ledger.workspace));
     },
     onError: (error) => toast.error(errorMessage(error, "Couldn't delete the ledger")),
   });
@@ -36,7 +39,7 @@ export function DangerZone({ ledger }: { ledger: Ledger }) {
     <Card className="animate-rise border-negative/40 ring-negative/20 [animation-delay:200ms]">
       <CardHeader>
         <CardTitle className="text-sm font-medium text-negative">Danger zone</CardTitle>
-        <CardDescription>Deleting a ledger permanently removes its files, history, collaborators and chat threads. This cannot be undone. Download an archive first if you might need it.</CardDescription>
+        <CardDescription>Deleting a ledger permanently removes its files, history, stars and chat threads. This cannot be undone. Download an archive first if you might need it.</CardDescription>
       </CardHeader>
       <CardContent>
         <AlertDialog

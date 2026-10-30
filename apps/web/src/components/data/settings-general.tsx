@@ -25,15 +25,15 @@ function useUpdateLedger(ledger: Ledger) {
   const qc = useQueryClient();
   const router = useRouter();
   return useMutation({
-    mutationFn: (patch: LedgerPatch) => apiPatch<Ledger>(ledgerPath(ledger.owner, ledger.slug), patch),
+    mutationFn: (patch: LedgerPatch) => apiPatch<Ledger>(ledgerPath(ledger.workspace, ledger.slug), patch),
     onSuccess: async (updated) => {
       void qc.invalidateQueries({ queryKey: keys.ledgers });
       if (updated.slug !== ledger.slug) {
         // Cached data under the old slug would 404 on refetch, so drop it and move to the new URL.
-        qc.removeQueries({ queryKey: keys.ledger(ledger.owner, ledger.slug) });
-        router.replace(`/ledger/${updated.owner}/${updated.slug}/settings`);
+        qc.removeQueries({ queryKey: keys.ledger(ledger.workspace, ledger.slug) });
+        router.replace(`/w/${updated.workspace}/${updated.slug}/settings`);
       } else {
-        await qc.invalidateQueries({ queryKey: keys.ledger(ledger.owner, ledger.slug) });
+        await qc.invalidateQueries({ queryKey: keys.ledger(ledger.workspace, ledger.slug) });
       }
     },
     onError: (error) => toast.error(errorMessage(error, "Couldn't update the ledger")),
@@ -78,7 +78,7 @@ export function GeneralCard({ ledger }: { ledger: Ledger }) {
             <Field data-invalid={!slugValid}>
               <FieldLabel htmlFor="settings-slug">Slug</FieldLabel>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-sm text-muted-foreground">/ledger/{ledger.owner}/</span>
+                <span className="font-mono text-sm text-muted-foreground">/w/{ledger.workspace}/</span>
                 <Input id="settings-slug" value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase())} aria-invalid={!slugValid} required maxLength={80} className="max-w-xs font-mono" />
               </div>
               <FieldDescription>{slugValid ? "Changing the slug changes every link to this ledger. Existing bookmarks will stop working." : "Use lowercase letters, digits and hyphens; start and end with a letter or digit."}</FieldDescription>
@@ -96,7 +96,7 @@ export function GeneralCard({ ledger }: { ledger: Ledger }) {
 }
 
 const VISIBILITY_OPTIONS = [
-  { value: "private", icon: LockIcon, title: "Private", description: "Only you and the collaborators you add can open this ledger." },
+  { value: "private", icon: LockIcon, title: "Private", description: "Only members of the workspace can open this ledger." },
   { value: "public", icon: GlobeIcon, title: "Public", description: "Anyone with the link can read this ledger. Only people with write access can change it." },
 ] as const;
 
@@ -108,7 +108,7 @@ export function VisibilityCard({ ledger }: { ledger: Ledger }) {
     <Card className="animate-rise [animation-delay:40ms]">
       <CardHeader>
         <CardTitle className="text-sm font-medium">Visibility</CardTitle>
-        <CardDescription>Only the owner can change who can see this ledger.</CardDescription>
+        <CardDescription>Workspace admins decide who can see this ledger.</CardDescription>
       </CardHeader>
       <CardContent>
         <RadioGroup value={visibility} onValueChange={(v) => setVisibility(v as Ledger["visibility"])} aria-label="Visibility">

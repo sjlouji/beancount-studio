@@ -1,3 +1,7 @@
+
+
+
+
 # Architecture and model integration
 
 How Beancount Studio is put together, where data lives, and how the assistant talks to models.
@@ -32,12 +36,16 @@ The repository layout and why it is a single repository: [ADR 0002](adr/0002-rep
 - **Ledgers are git repositories.** Each ledger is a working tree under the data directory.
   Every write, whether an editor save, a new entry, an import, a receipt or an assistant edit,
   is a commit authored by the signed-in user, so history and diffs come for free.
+- **Workspaces own ledgers.** A workspace is the tenant: people belong to it with a role
+  (owner, admin, member or viewer) and see every ledger in it
+  ([ADR 0003](adr/0003-workspaces-as-tenants.md)). Invite links carry a role and an expiry.
 - **One place builds paths.** `apps/api/app/storage.py` owns the storage tree under
-  `BS_DATA_DIR`: `ledgers/<id>/repo/` and `uploads/`. Nothing else joins paths. The layout
-  moves to per-workspace directories in the workspace model ([ADR 0003](adr/0003-workspaces-as-tenants.md)).
-- **Metadata is in PostgreSQL.** Users, sessions, ledgers, collaborators, stars, API keys, chat
-  threads and uploads. Ledger content never enters the database. Native runs and tests use
-  SQLite through the same code.
+  `BS_DATA_DIR`: `workspaces/<workspace>/ledgers/<ledger>/repo/` and `uploads/`. Nothing else
+  joins paths; deleting a workspace removes one directory.
+- **Metadata is in PostgreSQL.** Users, sessions, workspaces, memberships, invites, ledgers,
+  stars, API keys, chat threads and uploads. Ledger content never enters the database. Native
+  runs and tests use SQLite through the same code, with foreign-key enforcement on for every
+  connection so cascades behave as they do on PostgreSQL.
 - **Schema changes are Alembic revisions** bundled in `apps/api/app/db/migrations` and applied by
   the API at startup. A database created before migrations existed is detected and stamped
   with the baseline revision, then upgraded.
@@ -67,8 +75,16 @@ call. See ADR 0002.
 
 The web app never talks to Beancount directly. It calls the API through same-origin `/api/*`
 routes, which Next.js rewrites to the API container, so the session cookie works without CORS.
-Authentication accepts either that cookie or a personal access token, and ledger access is
-resolved into read, write or admin roles by dependencies in `apps/api/app/core/deps.py`.
+Authentication accepts either that cookie or a personal access token. Dependencies in
+`apps/api/app/core/deps.py` turn a person's workspace role into read, write or admin access to
+each of its ledgers; public ledgers are readable by anyone.
+
+Everything a person sees lives under a workspace: `/w/<workspace>` is its home, `/w/<workspace>/settings`
+holds its members, invite links and danger zone, and `/w/<workspace>/<ledger>/…` is a ledger.
+`/` opens the workspace used last in that browser, `/new` is the onboarding wizard (a workspace,
+its first ledger from a template with currency and fiscal year, invite links) and
+`/invite/<token>` accepts an invite link before or after signing in. Addresses from before
+workspaces (`/ledgers`, `/ledger/…`) redirect.
 
 The typed API layer on the client is `apps/web/src/lib/api/{client,types,hooks}.ts`; payload
 shapes there mirror the API's responses.
@@ -90,7 +106,16 @@ The person signs in there, sees which account the app wants to use, and approves
 jar, then loads the server already signed in. Approvals are single-use and expire after five
 minutes; the exchange answers 202 until one exists. In packaged builds the browser also opens
 `beancount-studio://signed-in`, which brings the window to the front. Any navigation to the
-server's own login or sign-up pages, for example after signing out, restarts this flow.
+server's own login or sign-up pages, for example after signing out, restarts this flow and the
+page the server was heading for (`/login?next=…`) opens once it is done.
+
+**The shell knows the workspaces.** The web client, when it runs inside the shell, sends the
+person's workspaces and the current one through the bridge (`window.studioDesktop.setWorkspaces`);
+the shell validates the payload and rebuilds its Workspace menu (⌘1–⌘9 to switch, create a
+workspace, settings, invite people, switch server) and the dock menu from it. Choosing a
+workspace loads its page on the server. `beancount-studio://w/…`, `invite/…`, `new`, `settings`
+and `u/…` deep links open that page of the connected server, after the browser sign-in when
+there is no session yet; a link cannot name a server.
 
 ## Deployment topology
 
@@ -170,9 +195,9 @@ personal access token created under Settings → API keys and sent as
 
 ```bash
 curl -H "Authorization: Bearer bsk_…" \
-  "https://studio.example.com/api/ledgers/ada/personal/query?q=SELECT%20account,%20sum(position)%20GROUP%20BY%20account"
+  "https://studio.example.com/api/workspaces/ada/ledgers/personal/query?q=SELECT%20account,%20sum(position)%20GROUP%20BY%20account"
 curl -H "Authorization: Bearer bsk_…" \
-  "https://studio.example.com/api/ledgers/ada/personal/reports/balance-sheet?time=2026&conversion=USD"
+  "https://studio.example.com/api/workspaces/ada/ledgers/personal/reports/balance-sheet?time=2026&conversion=USD"
 ```
 
 Errors are `AppError` subclasses with a stable `code`; the web client shows them through
@@ -181,6 +206,11 @@ toasts or an error state, never silently.
 ## Where this is going
 
 [ADR 0003](adr/0003-workspaces-as-tenants.md) introduces workspaces as the tenant, with
-memberships and roles, self-serve onboarding and a per-workspace storage tree. Phase 1 of that
-plan is in place: migrations, the storage path service, PostgreSQL in every stack and local
-HTTPS.
+memberships and roles, self-serve onboarding and a per-workspace storage tree. Phases 1 to 3
+are in place: migrations, the storage path service, PostgreSQL in every stack, local HTTPS, the
+workspace model with memberships, invite links and workspace-scoped ledger routes, the data
+migration that moved each person's ledgers into a workspace named after them, the web client's
+workspace routes, switcher, onboarding wizard, invite acceptance and workspace settings, and the
+launcher's backup, restore and update commands (phase 4, see the
+[production guide](production.md#data-backups-and-upgrades)). What remains is phase 5, the
+desktop app's workspace switcher and deep links.

@@ -8,10 +8,10 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 
-from app.core.deps import AuthDep, DbDep, SessionUserDep, SettingsDep, author_for
+from app.core.deps import AuthDep, DbDep, SessionUserDep, SettingsDep
 from app.core.mailer import send_email
 from app.core.security import hash_password, hash_token, new_token, verify_password
-from app.db.models import DesktopSignIn, Ledger, PasswordResetToken, Session, User, utcnow
+from app.db.models import DesktopSignIn, PasswordResetToken, Session, User, utcnow
 from app.errors import (
     ConflictError,
     FeatureDisabledError,
@@ -19,7 +19,6 @@ from app.errors import (
     UnauthorizedError,
     ValidationError,
 )
-from app.ledgers.store import get_store
 from app.logging_setup import get_logger
 from app.schemas import (
     ChangePasswordRequest,
@@ -89,24 +88,8 @@ async def sign_up(
         display_name=body.display_name.strip() or body.username,
         is_admin=user_count == 0,
     )
+    # No workspace yet: the person creates one or accepts an invite link next.
     db.add(user)
-    await db.flush()
-    if body.create_example_ledger:
-        ledger = Ledger(
-            owner_id=user.id,
-            slug="example",
-            title="Example ledger",
-            description="A sample ledger to explore the app.",
-        )
-        db.add(ledger)
-        await db.flush()
-        await get_store().create(
-            ledger.id,
-            template="example",
-            title="Example ledger",
-            currency="USD",
-            author=author_for(user),
-        )
     await db.commit()
     log.info("user %s signed up (admin=%s)", user.username, user.is_admin)
     token = await create_session(db, user, request, settings)

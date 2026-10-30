@@ -6,7 +6,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 
-export const DEEP_LINK_SCHEME = "beancount-studio";
+import { DEEP_LINK_SCHEME, isServerPath } from "./deep-link";
 
 const CHALLENGE = /^[0-9a-f]{64}$/;
 const AUTH_PAGES = new Set(["/login", "/sign-up", "/forgot-password", "/reset-password"]);
@@ -49,4 +49,14 @@ export function isAuthPage(url: string, serverOrigin: string): boolean {
   if (!URL.canParse(url)) return false;
   const parsed = new URL(url);
   return parsed.origin === serverOrigin && AUTH_PAGES.has(parsed.pathname);
+}
+
+/**
+ * Where the server wanted to go when it asked for a sign-in (`/login?next=/w/ada/books`), so the
+ * shell can land there once the browser flow is done. Only an absolute path on the server counts.
+ */
+export function authPageNext(url: string): string | null {
+  if (!URL.canParse(url)) return null;
+  const next = new URL(url).searchParams.get("next") ?? "";
+  return isServerPath(next) ? next : null;
 }

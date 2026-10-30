@@ -51,9 +51,9 @@ export function EntryEditor(props: { context: EntryContext; onSaved?: () => void
 }
 
 function EntryEditorInner({ context, onSaved, onDeleted }: { context: EntryContext; onSaved?: () => void; onDeleted?: () => void }) {
-  const { owner, slug, canWrite, base } = useLedgerContext();
-  const update = useUpdateEntry(owner, slug);
-  const remove = useDeleteEntry(owner, slug);
+  const { workspace, slug, canWrite, base } = useLedgerContext();
+  const update = useUpdateEntry(workspace, slug);
+  const remove = useDeleteEntry(workspace, slug);
   const [source, setSource] = useState(context.slice);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const dirty = source !== context.slice;
@@ -150,8 +150,8 @@ function EntryEditorInner({ context, onSaved, onDeleted }: { context: EntryConte
 }
 
 export function EntryContextSheet({ entryHash, onOpenChange }: { entryHash: string | null; onOpenChange: (open: boolean) => void }) {
-  const { owner, slug, base } = useLedgerContext();
-  const query = useEntryContext(owner, slug, entryHash);
+  const { workspace, slug, base } = useLedgerContext();
+  const query = useEntryContext(workspace, slug, entryHash);
   return (
     <Sheet open={Boolean(entryHash)} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl">

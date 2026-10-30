@@ -123,13 +123,13 @@ function Welcome() {
 }
 
 export function LedgerAssistant({ threadId, initialMessages }: { threadId: string; initialMessages: StoredMessage[] | undefined }) {
-  const { owner, slug } = useLedgerContext();
+  const { workspace, slug } = useLedgerContext();
   const qc = useQueryClient();
   const attachments = useMemo(() => new CompositeAttachmentAdapter([new SimpleImageAttachmentAdapter(), new SimpleTextAttachmentAdapter(), new PdfAttachmentAdapter()]), []);
   const initial = useMemo(() => toInitialMessages(initialMessages), [initialMessages]);
 
   const runtime = useDataStreamRuntime({
-    api: `/api${ledgerPath(owner, slug)}/chat`,
+    api: `/api${ledgerPath(workspace, slug)}/chat`,
     protocol: "data-stream",
     body: { threadId },
     initialMessages: initial,
@@ -138,8 +138,8 @@ export function LedgerAssistant({ threadId, initialMessages }: { threadId: strin
     adapters: { attachments },
     onError: (error) => toast.error(error.message),
     onFinish: () => {
-      void qc.invalidateQueries({ queryKey: keys.ledgerScope(owner, slug, "chat-threads") });
-      void qc.invalidateQueries({ queryKey: keys.ledger(owner, slug) });
+      void qc.invalidateQueries({ queryKey: keys.ledgerScope(workspace, slug, "chat-threads") });
+      void qc.invalidateQueries({ queryKey: keys.ledger(workspace, slug) });
     },
   });
 

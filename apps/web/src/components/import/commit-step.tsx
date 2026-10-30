@@ -29,8 +29,8 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
 }
 
 export function CommitStep({ state, dispatch, onBack, onReset }: { state: WizardState; dispatch: Dispatch<WizardAction>; onBack: () => void; onReset: () => void }) {
-  const { owner, slug, base, meta, precisions } = useLedgerContext();
-  const invalidate = useInvalidateLedger(owner, slug);
+  const { workspace, slug, base, meta, precisions } = useLedgerContext();
+  const invalidate = useInvalidateLedger(workspace, slug);
   const { statement, rows, sourceAccount, currency, result } = state;
 
   const included = useMemo(
@@ -62,7 +62,7 @@ export function CommitStep({ state, dispatch, onBack, onReset }: { state: Wizard
 
   const commit = useMutation({
     mutationFn: () =>
-      apiPost<ImportCommitResult>(`${ledgerPath(owner, slug)}/imports/commit`, {
+      apiPost<ImportCommitResult>(`${ledgerPath(workspace, slug)}/imports/commit`, {
         rows: included.map((v) => ({
           id: v.row.id,
           date: v.row.date,

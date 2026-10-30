@@ -1,15 +1,19 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { app, BrowserWindow, dialog, ipcMain, net, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell } from "electron";
 import log from "electron-log/main";
 
-import type { ConnectChannel, ConnectResult, SignInCancelChannel, SignInReopenChannel } from "./ipc";
+import type { DesktopWorkspace, DesktopWorkspaceUpdate } from "@beancount-studio/desktop-bridge";
+
+import { DEEP_LINK_SCHEME, parseOpenDeepLink } from "./deep-link";
+import type { ConnectChannel, ConnectResult, SignInCancelChannel, SignInReopenChannel, WorkspacesChannel } from "./ipc";
+import { dockMenuEntries, workspaceMenuEntries, type WorkspaceMenuEntry } from "./menu";
 import { healthUrl, isOnServer, normalizeServerUrl, ServerUrlError } from "./server-url";
 import { readSettings, writeSettings } from "./settings";
 import {
+  authPageNext,
   createSignInChallenge,
-  DEEP_LINK_SCHEME,
   isAuthPage,
   parseSignedInDeepLink,
   signInUrl,
@@ -21,6 +25,7 @@ log.initialize();
 const CONNECT_CHANNEL: ConnectChannel = "server:connect";
 const SIGN_IN_REOPEN_CHANNEL: SignInReopenChannel = "sign-in:reopen";
 const SIGN_IN_CANCEL_CHANNEL: SignInCancelChannel = "sign-in:cancel";
+const WORKSPACES_CHANNEL: WorkspacesChannel = "workspaces:update";
 
 const CONNECT_PAGE = pathToFileURL(join(__dirname, "..", "static", "connect.html")).href;
 const REQUEST_TIMEOUT_MS = 5000;
@@ -28,6 +33,10 @@ const SIGN_IN_POLL_MS = 2000;
 const SIGN_IN_TIMEOUT_MS = 10 * 60 * 1000;
 const ERR_ABORTED = -3; // Chromium: navigation superseded by another one, not a failure.
 const GRANTED_PERMISSIONS = new Set(["notifications", "clipboard-sanitized-write", "fullscreen"]);
+// Bounds on what a server page may put in the Workspace menu.
+const MAX_WORKSPACES = 50;
+const WORKSPACE_SLUG = /^[a-z0-9-]{1,40}$/;
+const WORKSPACE_ROLES = new Set(["owner", "admin", "member", "viewer"]);
 
 interface PendingSignIn {
   origin: string;
@@ -40,6 +49,9 @@ interface PendingSignIn {
 let mainWindow: BrowserWindow | null = null;
 let serverOrigin: string | null = null;
 let pendingSignIn: PendingSignIn | null = null;
+/** A page to open on the server as soon as it is loaded and signed in (deep link, or the server's own `next`). */
+let pendingPath: string | null = null;
+let workspaces: DesktopWorkspaceUpdate | null = null;
 
 function describe(error: unknown): string {
   if (!(error instanceof Error)) return String(error);
@@ -70,6 +82,7 @@ async function showConnect(state: { url?: string; error?: string } = {}): Promis
   if (state.url) params.set("url", state.url);
   if (state.error) params.set("error", state.error);
   const query = params.toString();
+  setWorkspaces(null);
   await mainWindow?.loadURL(query ? `${CONNECT_PAGE}?${query}` : CONNECT_PAGE);
 }
 
@@ -78,18 +91,22 @@ async function showWaiting(origin: string): Promise<void> {
   await mainWindow?.loadURL(`${CONNECT_PAGE}?${params}`);
 }
 
-async function loadServer(origin: string): Promise<void> {
-  log.info("loading server", origin);
+/** Loads a page of the server: the pending one if any, else `path`, else the front page. */
+async function loadServer(origin: string, path?: string): Promise<void> {
+  const target = pendingPath ?? path ?? "/";
+  pendingPath = null;
+  const url = new URL(target, origin).href;
+  log.info("loading", url);
   try {
-    await mainWindow?.loadURL(origin);
+    await mainWindow?.loadURL(url);
   } catch (error) {
     // did-fail-load has already switched to the connect screen, which supersedes this
     // navigation and rejects it with ERR_ABORTED; anything else is unexpected.
     const errno = (error as { errno?: number }).errno;
     if (errno === ERR_ABORTED) {
-      log.debug("loadURL superseded", origin);
+      log.debug("loadURL superseded", url);
     } else {
-      log.warn("loadURL rejected", origin, describe(error));
+      log.warn("loadURL rejected", url, describe(error));
     }
   }
 }
@@ -192,29 +209,116 @@ async function pollSignIn(): Promise<void> {
   }
 }
 
+/**
+ * Opens a page of the connected server: now, or once the server is loaded and signed in. A deep
+ * link that launched the app arrives before the window exists and waits here for `start()`.
+ */
+function openOnServer(path: string): void {
+  pendingPath = path;
+  mainWindow?.show();
+  mainWindow?.focus();
+  if (serverOrigin !== null && pendingSignIn === null && mainWindow !== null) {
+    void loadServer(serverOrigin);
+  }
+}
+
 function handleDeepLink(url: string): void {
   const challenge = parseSignedInDeepLink(url);
-  if (!challenge) {
+  if (challenge) {
+    if (pendingSignIn?.secret.challenge !== challenge) {
+      log.warn("deep link does not match the pending sign-in");
+      return;
+    }
+    log.info("browser signalled sign-in completion");
+    mainWindow?.show();
+    mainWindow?.focus();
+    void pollSignIn();
+    return;
+  }
+  const path = parseOpenDeepLink(url);
+  if (!path) {
     log.warn("ignored deep link", url);
     return;
   }
-  if (pendingSignIn?.secret.challenge !== challenge) {
-    log.warn("deep link does not match the pending sign-in");
-    return;
-  }
-  log.info("browser signalled sign-in completion");
-  mainWindow?.show();
-  mainWindow?.focus();
-  void pollSignIn();
+  log.info("deep link opens", path);
+  openOnServer(path);
 }
 
 /** The server's own sign-in pages never render in the shell; the browser flow replaces them. */
 function interceptAuthPage(url: string): boolean {
   if (serverOrigin === null || !isAuthPage(url, serverOrigin)) return false;
   log.info("server asked for sign-in; switching to the browser flow");
+  // The page the server was heading for comes back once the browser flow is done.
+  pendingPath = authPageNext(url) ?? pendingPath;
   void beginSignIn(serverOrigin);
   return true;
 }
+
+// ---------------------------------------------------------------- menus
+
+function menuItem(entry: WorkspaceMenuEntry): Electron.MenuItemConstructorOptions {
+  if (entry.separator) return { type: "separator" };
+  const options: Electron.MenuItemConstructorOptions = {
+    label: entry.label,
+    enabled: entry.enabled ?? true,
+    accelerator: entry.accelerator,
+  };
+  if (entry.checked !== undefined) {
+    options.type = "radio";
+    options.checked = entry.checked;
+  }
+  if (entry.path !== undefined) {
+    const path = entry.path;
+    options.click = () => openOnServer(path);
+  } else if (entry.action === "switch-server") {
+    options.click = () => {
+      cancelSignIn();
+      void showConnect({ url: serverOrigin ?? undefined });
+    };
+  }
+  return options;
+}
+
+/** The application menu: the platform's standard menus plus Workspace, rebuilt whenever the list changes. */
+function applyMenus(): void {
+  const connected = serverOrigin !== null;
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(process.platform === "darwin" ? [{ role: "appMenu" } as const] : []),
+    { role: "editMenu" },
+    { label: "Workspace", submenu: workspaceMenuEntries(workspaces, connected).map(menuItem) },
+    { role: "viewMenu" },
+    { role: "windowMenu" },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  if (process.platform === "darwin") {
+    app.dock?.setMenu(Menu.buildFromTemplate(dockMenuEntries(workspaces, connected).map(menuItem)));
+  }
+}
+
+function setWorkspaces(update: DesktopWorkspaceUpdate | null): void {
+  workspaces = update;
+  applyMenus();
+}
+
+/** The web client's update, checked field by field: it is data from a page, not trusted structure. */
+function parseWorkspaceUpdate(input: unknown): DesktopWorkspaceUpdate | null {
+  if (typeof input !== "object" || input === null) return null;
+  const { workspaces: list, current } = input as { workspaces?: unknown; current?: unknown };
+  if (!Array.isArray(list) || list.length > MAX_WORKSPACES) return null;
+  if (current !== null && (typeof current !== "string" || !WORKSPACE_SLUG.test(current))) return null;
+  const parsed: DesktopWorkspace[] = [];
+  for (const item of list) {
+    if (typeof item !== "object" || item === null) return null;
+    const { slug, name, role } = item as { slug?: unknown; name?: unknown; role?: unknown };
+    if (typeof slug !== "string" || !WORKSPACE_SLUG.test(slug)) return null;
+    if (typeof name !== "string" || name.length === 0 || name.length > 120) return null;
+    if (typeof role !== "string" || !WORKSPACE_ROLES.has(role)) return null;
+    parsed.push({ slug, name, role: role as DesktopWorkspace["role"] });
+  }
+  return { workspaces: parsed, current: current as string | null };
+}
+
+// ---------------------------------------------------------------- window
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -306,6 +410,7 @@ ipcMain.handle(CONNECT_CHANNEL, async (event, input: unknown): Promise<ConnectRe
     return { ok: false, error: `Could not reach ${origin}: ${describe(error)}` };
   }
   writeSettings({ serverUrl: origin });
+  if (origin !== serverOrigin) pendingPath = null; // a page of another server means nothing here
   await ensureSignedIn(origin);
   return { ok: true };
 });
@@ -328,6 +433,21 @@ ipcMain.handle(SIGN_IN_CANCEL_CHANNEL, async (event): Promise<void> => {
   await showConnect({ url: origin });
 });
 
+ipcMain.on(WORKSPACES_CHANNEL, (event, input: unknown) => {
+  const sender = event.senderFrame?.url ?? "";
+  if (serverOrigin === null || !isOnServer(sender, serverOrigin)) {
+    log.warn("workspace update rejected, sender is not the server", sender);
+    return;
+  }
+  const update = parseWorkspaceUpdate(input);
+  if (!update) {
+    log.warn("workspace update rejected, malformed payload");
+    return;
+  }
+  log.debug("workspace menu", { workspaces: update.workspaces.length, current: update.current });
+  setWorkspaces(update);
+});
+
 async function start(): Promise<void> {
   const { settings, problem } = readSettings();
   const target = process.env.STUDIO_SERVER_URL ?? settings.serverUrl;
@@ -346,9 +466,10 @@ async function start(): Promise<void> {
   await ensureSignedIn(origin);
 }
 
-// Deep links (`beancount-studio://signed-in?…`) bring the window back once the browser is done.
-// macOS only delivers them to a packaged app whose Info.plist declares the scheme
-// (electron-builder.yml, `protocols`); in development the shell relies on polling alone.
+// Deep links: `beancount-studio://signed-in?…` brings the window back once the browser is done,
+// `beancount-studio://w/<workspace>/…` opens that page of the connected server. macOS only
+// delivers them to a packaged app whose Info.plist declares the scheme (electron-builder.yml,
+// `protocols`); in development the sign-in relies on polling alone.
 if (app.isPackaged) {
   app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
 }
@@ -372,6 +493,7 @@ app
   .whenReady()
   .then(async () => {
     configureSession();
+    applyMenus();
     mainWindow = createWindow();
     await start();
     app.on("activate", () => {

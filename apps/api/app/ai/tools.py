@@ -16,7 +16,7 @@ from app.core.deps import LedgerAccess, author_for
 from app.errors import AppError
 from app.ledgers import engine
 from app.ledgers.engine import ReportQuery
-from app.ledgers.store import LedgerStore, safe_relative_path
+from app.ledgers.store import LedgerRef, LedgerStore, safe_relative_path
 from app.logging_setup import get_logger
 
 log = get_logger(__name__)
@@ -194,11 +194,11 @@ class ToolContext:
 
 
 def _preview_ops(
-    files: list[dict[str, Any]], store: LedgerStore, ledger_id: str
+    files: list[dict[str, Any]], store: LedgerStore, ledger: LedgerRef
 ) -> dict[str, str | None]:
     """Resolve operations into path -> projected content (None = delete)."""
     changes: dict[str, str | None] = {}
-    repo = store.paths(ledger_id).repo
+    repo = store.paths(ledger).repo
     for op in files:
         kind = op.get("operation")
         path = op.get("path", "")
@@ -261,8 +261,8 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
     ledger = access.ledger
     try:
         if name == "get_ledger_summary":
-            meta = await store.run(ledger.id, engine.ledger_meta, ledger.main_file)
-            attrs = await store.run(ledger.id, engine.attributes, ledger.main_file)
+            meta = await store.run(ledger, engine.ledger_meta)
+            attrs = await store.run(ledger, engine.attributes)
             return {
                 "title": meta["title"],
                 "operatingCurrencies": meta["operatingCurrencies"],
@@ -280,11 +280,10 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
             }, False
         if name == "run_bql_query":
             result = await store.run(
-                ledger.id,
+                ledger,
                 lambda f: engine.run_query(
                     f, ReportQuery(), args["query"], max_rows=MAX_QUERY_ROWS
                 ),
-                ledger.main_file,
             )
             if result["type"] == "text":
                 return {"text": result["contents"][:20000]}, False
@@ -297,15 +296,13 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
         if name == "get_report":
             conversion = args.get("conversion") or None
             if not conversion:
-                meta = await store.run(ledger.id, engine.ledger_meta, ledger.main_file)
+                meta = await store.run(ledger, engine.ledger_meta)
                 conversion = (meta["operatingCurrencies"] or ["at_cost"])[0]
             q = ReportQuery(time=args.get("time") or None, conversion=conversion)
             depth = int(args.get("depth") or 3)
             report = args["report"]
             if report == "income_statement":
-                data = await store.run(
-                    ledger.id, lambda f: engine.income_statement(f, q), ledger.main_file
-                )
+                data = await store.run(ledger, lambda f: engine.income_statement(f, q))
                 lines = [
                     "# Income",
                     *_compact_tree(data["trees"]["income"], depth),
@@ -315,9 +312,7 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
                     *_compact_tree(data["trees"]["netProfit"], 1),
                 ]
             elif report == "balance_sheet":
-                data = await store.run(
-                    ledger.id, lambda f: engine.balance_sheet(f, q), ledger.main_file
-                )
+                data = await store.run(ledger, lambda f: engine.balance_sheet(f, q))
                 lines = [
                     "# Assets",
                     *_compact_tree(data["trees"]["assets"], depth),
@@ -327,9 +322,7 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
                     *_compact_tree(data["trees"]["equity"], depth),
                 ]
             else:
-                data = await store.run(
-                    ledger.id, lambda f: engine.cash_flow(f, q), ledger.main_file
-                )
+                data = await store.run(ledger, lambda f: engine.cash_flow(f, q))
                 lines = [
                     f"{i['begin']}..{i['date']}: operating {i['operating']} investing {i['investing']} financing {i['financing']} net {i['netChange']} closing cash {i['closingCash']}"
                     for i in data["intervals"][-12:]
@@ -343,11 +336,10 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
             q = ReportQuery(time=args.get("time") or None, account=args.get("account") or None)
             limit = min(int(args.get("limit") or 20), 100)
             data = await store.run(
-                ledger.id,
+                ledger,
                 lambda f: engine.journal(
                     f, q, types=["Transaction"], search=args["text"], limit=limit
                 ),
-                ledger.main_file,
             )
             rows = [
                 {
@@ -365,7 +357,7 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
             ]
             return {"total": data["total"], "transactions": rows}, False
         if name == "list_ledger_files":
-            repo_root = store.paths(ledger.id).repo
+            repo_root = store.paths(ledger).repo
             files = []
             for path in sorted(repo_root.rglob("*")):
                 if ".git" in path.parts:
@@ -374,7 +366,7 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
                 files.append(f"{rel}/" if path.is_dir() else f"{rel} ({path.stat().st_size} bytes)")
             return {"files": files}, False
         if name == "read_ledger_file":
-            text, _sha = store.read_file(ledger.id, args["path"])
+            text, _sha = store.read_file(ledger, args["path"])
             lines = text.splitlines()
             start = max(int(args.get("start_line") or 1), 1)
             end = min(int(args.get("end_line") or (start + MAX_FILE_LINES - 1)), len(lines))
@@ -390,9 +382,9 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
                 "content": numbered,
             }, False
         if name == "check_ledger_edit":
-            changes = _preview_ops(args["files"], store, ledger.id)
-            before = await store.run(ledger.id, engine.errors, ledger.main_file)
-            projection = await store.project(ledger.id, changes, ledger.main_file)
+            changes = _preview_ops(args["files"], store, ledger)
+            before = await store.run(ledger, engine.errors)
+            projection = await store.project(ledger, changes)
             before_msgs = {e["message"] for e in before}
             new_errors = [e.to_dict() for e in projection.errors if e.message not in before_msgs]
             return {
@@ -414,19 +406,19 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
                     "message": "Call request_approval with the identical description and files, wait for the user's approval, then call edit_ledger_files again.",
                     "operationsHash": ops_hash,
                 }, True
-            changes = _preview_ops(args["files"], store, ledger.id)
-            before = await store.run(ledger.id, engine.errors, ledger.main_file)
-            projection = await store.project(ledger.id, changes, ledger.main_file)
+            changes = _preview_ops(args["files"], store, ledger)
+            before = await store.run(ledger, engine.errors)
+            projection = await store.project(ledger, changes)
             before_msgs = {e["message"] for e in before}
             new_errors = [e.to_dict() for e in projection.errors if e.message not in before_msgs]
-            async with store.write_lock(ledger.id):
+            async with store.write_lock(ledger):
                 for rel, content in changes.items():
                     if content is None:
-                        store.delete_file(ledger.id, rel)
+                        store.delete_file(ledger, rel)
                     else:
-                        store.write_file(ledger.id, rel, content)
+                        store.write_file(ledger, rel, content)
                 sha = await store.commit(
-                    ledger.id, args["description"][:200], author_for(access.auth.user)
+                    ledger, args["description"][:200], author_for(access.auth.user)
                 )
             ctx.approved_hashes.discard(ops_hash)
             log.info("assistant committed %s to ledger %s", sha, ledger.id)

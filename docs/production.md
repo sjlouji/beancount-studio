@@ -103,9 +103,20 @@ server address: `https://localhost:8443` for the laptop stack after the trust st
 browser to sign in. Sign in there, approve "Sign in to the desktop app", and return to the app;
 it picks up the session on its own. There is no login form inside the app.
 
-To change servers, quit the app and remove
-`~/Library/Application Support/beancount-studio-desktop/settings.json`, or launch once with
+To change servers, choose Workspace → Switch Server…, or launch once with
 `STUDIO_SERVER_URL=https://other.example.com` set.
+
+### Workspaces and links
+
+The Workspace menu lists your workspaces on the connected server; ⌘1 to ⌘9 switch between them,
+and the dock icon's menu lists them too. The menu also creates a workspace, opens the current
+one's settings and, for owners and admins, its invite links.
+
+`beancount-studio://` links open a page of the connected server in the app:
+`beancount-studio://w/<workspace>/<ledger>` for a ledger, `beancount-studio://invite/<token>`
+for an invitation (the invitation page in a browser offers this link). If the app is not signed
+in yet, it signs in through the browser first and then opens the page. Links never name a
+server, so one cannot point the app at another host.
 
 ### Signing and sharing
 
@@ -159,28 +170,40 @@ paths inside the data directory.
 
 ## Data, backups and upgrades
 
-Two volumes hold everything: `studio-data` (ledgers and uploads, mounted at `/data` in the API
-container) and `postgres-data`. Back up both together.
+Two volumes hold everything: `studio-data` (every workspace's ledgers and the uploads, mounted
+at `/data` in the API container) and `postgres-data`. The launcher keeps them together.
 
 ```bash
-# database
-./studio.sh prod exec -T postgres pg_dump -U studio -d studio > studio-$(date +%F).sql
-# ledgers and uploads
-docker run --rm -v beancount-studio_studio-data:/data -v "$PWD":/backup alpine \
-  tar czf /backup/studio-data-$(date +%F).tgz -C /data .
+./studio.sh prod backup                 # → backups/beancount-studio-prod-2026-10-30-031500.tar
+./studio.sh prod backup /mnt/offsite    # anywhere else
+./studio.sh prod restore backups/beancount-studio-prod-2026-10-30-031500.tar
+./studio.sh prod update                 # backup, git pull, rebuild, restart
 ```
 
-Restore by reversing the two: `psql` the dump into a fresh `postgres` service, and extract the
-archive into an empty `studio-data` volume before starting the API. Use `local` in place of
-`prod` for the laptop stack; the volume names are the same.
+Use `local` in place of `prod` for the laptop stack; the volumes have the same names, so a backup
+made on a laptop restores on a server and the other way round. The `dev` stack has none of this:
+its ledgers are the host directory `apps/api/data` and its database is disposable.
 
-Upgrading is pulling the new code and starting again. Images are rebuilt and the API runs any
-new migrations before it accepts traffic:
+**backup** writes one tar file holding a `manifest.txt` (when, which stack, app version, database
+revision), `database.dump` (`pg_dump` in custom format) and `data.tar.gz` (the data volume without
+its scratch directory). The stack keeps running; the files are read before the database is dumped,
+so a ledger created during the backup is at worst missing from it entirely rather than half
+present. For a nightly copy, a cron line will do:
 
-```bash
-git pull
-./studio.sh prod
 ```
+0 3 * * * /srv/beancount-studio/studio.sh prod backup /srv/backups >> /var/log/studio-backup.log 2>&1
+```
+
+**restore** unpacks an archive, asks you to type `restore` (or takes `--yes`, for scripts), stops
+the API, empties the data volume and fills it from the archive, drops and recreates the database
+from the dump, then starts the stack again. The API applies any migrations the code has gained
+since the backup was made. An archive made by a newer version than the checkout is refused until
+you update the code. The stack must have started once on the machine so that its volumes exist.
+
+**update** backs up first (skip with `--no-backup`), pulls the code when the checkout tracks a
+remote branch, pulls newer base images, rebuilds the API and web images and restarts the stack;
+the API runs new migrations before it accepts traffic. Old images stay on disk until you run
+`docker image prune`.
 
 ## Troubleshooting
 

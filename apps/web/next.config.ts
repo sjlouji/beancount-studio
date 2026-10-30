@@ -21,6 +21,13 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
   },
+  // Addresses from before workspaces had their own routes keep working.
+  async redirects() {
+    return [
+      { source: "/ledgers", destination: "/", permanent: true },
+      { source: "/ledger/:workspace/:slug*", destination: "/w/:workspace/:slug*", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

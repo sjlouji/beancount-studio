@@ -132,7 +132,7 @@ export function RemoteCard({ ledger }: { ledger: Ledger }) {
 }
 
 function ConnectRemoteCard({ ledger }: { ledger: Ledger }) {
-  const connect = useConnectRemote(ledger.owner, ledger.slug);
+  const connect = useConnectRemote(ledger.workspace, ledger.slug);
   const [source, setSource] = useState<RemoteSource>(EMPTY_SOURCE);
 
   const onSubmit = (event: FormEvent) => {
@@ -200,9 +200,9 @@ function ResolveButton({ keep, label, description, pending, onConfirm }: { keep:
 }
 
 function ConnectedRemoteCard({ ledger, remote }: { ledger: Ledger; remote: LedgerRemote }) {
-  const sync = useSyncRemote(ledger.owner, ledger.slug);
-  const disconnect = useDisconnectRemote(ledger.owner, ledger.slug);
-  const resolve = useResolveRemote(ledger.owner, ledger.slug);
+  const sync = useSyncRemote(ledger.workspace, ledger.slug);
+  const disconnect = useDisconnectRemote(ledger.workspace, ledger.slug);
+  const resolve = useResolveRemote(ledger.workspace, ledger.slug);
 
   const runSync = () =>
     sync.mutate(undefined, {

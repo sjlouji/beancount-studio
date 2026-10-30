@@ -18,12 +18,12 @@ const EVENT_LINE = /^\s*\d{4}-\d{2}-\d{2}\s+event\s+"((?:[^"\\]|\\.)*)"/;
  * event type is missing from `/events`. When `type_` is absent we recover it from the source
  * line of each event (one cached file read per distinct file).
  */
-export function useEventTypes(owner: string, slug: string, events: Entry[] | undefined) {
+export function useEventTypes(workspace: string, slug: string, events: Entry[] | undefined) {
   const filenames = useMemo(() => Array.from(new Set((events ?? []).filter((e) => !e.type_ && e.filename).map((e) => e.filename!))), [events]);
   const files = useQueries({
     queries: filenames.map((path) => ({
-      queryKey: keys.ledgerScope(owner, slug, "file", path, "HEAD"),
-      queryFn: () => apiGet<FileContent>(`${ledgerPath(owner, slug)}/files/content`, { path }),
+      queryKey: keys.ledgerScope(workspace, slug, "file", path, "HEAD"),
+      queryFn: () => apiGet<FileContent>(`${ledgerPath(workspace, slug)}/files/content`, { path }),
     })),
   });
 

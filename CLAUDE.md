@@ -36,8 +36,8 @@ pnpm exec tsc --noEmit && pnpm lint && pnpm build
 
 - No silent failures: every API error is an `AppError` subclass with a code; the web shows
   `errorMessage(err)` via toast or `ErrorState`.
-- Ledger content is never stored in the database — only metadata (users, ledgers, collaborators,
-  keys, chat threads, uploads).
+- Ledger content is never stored in the database — only metadata (users, workspaces, members,
+  invites, ledgers, keys, chat threads, uploads).
 - Keep REST payload shapes in sync with `apps/web/src/lib/api/types.ts`.
 - UI: `DESIGN.md` is the design system (aubergine primary, pill buttons, Inter, cream/lavender
   surfaces, link blue). Tokens only (no raw colours), tabular numbers, h1 only through

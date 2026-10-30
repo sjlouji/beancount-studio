@@ -20,11 +20,11 @@ const PAGE_SIZE = 50;
 
 /** Entries touching an account with the change each made and the running balance after it. */
 export function AccountJournalCard({ account, inverted }: { account: string; inverted: boolean }) {
-  const { owner, slug, params, conversion, precisions } = useLedgerContext();
+  const { workspace, slug, params, conversion, precisions } = useLedgerContext();
   const [withChildren, setWithChildren] = useState(true);
   const [offset, setOffset] = useState(0);
   const [openEntry, setOpenEntry] = useState<string | null>(null);
-  const journal = useAccountJournal(owner, slug, account, { ...params, conversion, offset, limit: PAGE_SIZE, withChildren });
+  const journal = useAccountJournal(workspace, slug, account, { ...params, conversion, offset, limit: PAGE_SIZE, withChildren });
 
   const total = journal.data?.total ?? 0;
   const pageStart = total === 0 ? 0 : offset + 1;

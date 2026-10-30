@@ -95,8 +95,8 @@ def fake_ai(monkeypatch: pytest.MonkeyPatch):
 async def test_chat_streams_text_and_runs_backend_tool(
     client: AsyncClient, user: dict, ledger: dict, fake_ai
 ):
-    owner, slug = ledger["owner"], ledger["slug"]
-    base = f"/api/ledgers/{owner}/{slug}/chat"
+    ledger_base = f"/api/workspaces/{ledger['workspace']}/ledgers/{ledger['slug']}"
+    base = f"{ledger_base}/chat"
     thread = (await client.post(f"{base}/threads")).json()
     ai = fake_ai(
         [
@@ -146,8 +146,8 @@ async def test_chat_streams_text_and_runs_backend_tool(
 async def test_edit_requires_approval_then_commits(
     client: AsyncClient, user: dict, ledger: dict, fake_ai
 ):
-    owner, slug = ledger["owner"], ledger["slug"]
-    base = f"/api/ledgers/{owner}/{slug}/chat"
+    ledger_base = f"/api/workspaces/{ledger['workspace']}/ledgers/{ledger['slug']}"
+    base = f"{ledger_base}/chat"
     files = [
         {
             "operation": "append",
@@ -238,17 +238,15 @@ async def test_edit_requires_approval_then_commits(
     assert res.status_code == 200, res.text
     assert '"committed": true' in res.text
     assert len(ai.requests) == 2
-    journal = await client.get(
-        f"/api/ledgers/{owner}/{slug}/journal", params={"search": "Test Cafe"}
-    )
+    journal = await client.get(f"{ledger_base}/journal", params={"search": "Test Cafe"})
     assert journal.json()["total"] == 1
-    commits = await client.get(f"/api/ledgers/{owner}/{slug}/commits")
+    commits = await client.get(f"{ledger_base}/commits")
     assert commits.json()["commits"][0]["subject"] == "Add espresso"
 
 
 async def test_chat_disabled_without_provider(client: AsyncClient, user: dict, ledger: dict):
     res = await client.post(
-        f"/api/ledgers/{ledger['owner']}/{ledger['slug']}/chat",
+        f"/api/workspaces/{ledger['workspace']}/ledgers/{ledger['slug']}/chat",
         json={"messages": [{"role": "user", "content": "hi"}]},
     )
     assert res.status_code == 503

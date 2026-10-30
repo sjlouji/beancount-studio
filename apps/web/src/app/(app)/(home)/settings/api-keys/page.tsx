@@ -38,9 +38,9 @@ function Usage() {
   // The origin is only known in the browser; fall back to a placeholder for the server render.
   const origin = useSyncExternalStore(noopSubscribe, () => window.location.origin, () => "https://your-host");
   const example = ledgers.data?.[0];
-  const owner = example?.owner ?? me?.username ?? "{owner}";
+  const workspace = example?.workspace ?? "{workspace}";
   const slug = example?.slug ?? "{slug}";
-  const curl = `curl -H "Authorization: Bearer bsk_…" \\\n  "${origin}/api/ledgers/${owner}/${slug}/query?q=SELECT%20account,%20sum(position)%20GROUP%20BY%20account"`;
+  const curl = `curl -H "Authorization: Bearer bsk_…" \\\n  "${origin}/api/workspaces/${workspace}/ledgers/${slug}/query?q=SELECT%20account,%20sum(position)%20GROUP%20BY%20account"`;
   return (
     <SettingsCard
       title="Using API keys"

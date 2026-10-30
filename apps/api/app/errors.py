@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -64,6 +65,21 @@ def _error_body(code: str, message: str, details: dict[str, Any] | None = None) 
     return {"error": {"code": code, "message": message, "details": details or {}}}
 
 
+def _field_errors(errors: list[Any]) -> list[Any]:
+    """Pydantic keeps the exception a validator raised under `ctx`; the response wants its text."""
+    cleaned = []
+    for error in errors:
+        item = dict(error)
+        ctx = item.get("ctx")
+        if isinstance(ctx, dict):
+            item["ctx"] = {
+                key: str(value) if isinstance(value, Exception) else value
+                for key, value in ctx.items()
+            }
+        cleaned.append(item)
+    return jsonable_encoder(cleaned)
+
+
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(request: Request, exc: AppError) -> JSONResponse:
@@ -84,7 +100,9 @@ def install_error_handlers(app: FastAPI) -> None:
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
-            content=_error_body("validation_error", "Invalid request", {"errors": exc.errors()}),
+            content=_error_body(
+                "validation_error", "Invalid request", {"errors": _field_errors(exc.errors())}
+            ),
         )
 
     @app.exception_handler(Exception)

@@ -10,6 +10,9 @@
 .env.*.local
 deploy/.env
 
+# Backups written by ./studio.sh <mode> backup
+backups/
+
 # Python
 apps/api/.venv
 apps/api/data

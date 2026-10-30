@@ -13,7 +13,7 @@ export function BrandMark({ className }: { className?: string }) {
   );
 }
 
-export function Brand({ href = "/ledgers", compact = false, className }: { href?: string; compact?: boolean; className?: string }) {
+export function Brand({ href = "/", compact = false, className }: { href?: string; compact?: boolean; className?: string }) {
   return (
     <Link href={href} className={cn("flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/40", className)}>
       <BrandMark />

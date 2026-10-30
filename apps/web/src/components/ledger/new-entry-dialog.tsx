@@ -78,8 +78,8 @@ export function NewEntryDialog(props: NewEntryDialogProps) {
 }
 
 function NewEntryForm({ open, onOpenChange, initialKind = "Transaction", initialAccount, onCreated }: NewEntryDialogProps) {
-  const { owner, slug, meta, attributes, precisions } = useLedgerContext();
-  const addEntries = useAddEntries(owner, slug);
+  const { workspace, slug, meta, attributes, precisions } = useLedgerContext();
+  const addEntries = useAddEntries(workspace, slug);
   const currency = meta?.operatingCurrencies[0] ?? "USD";
 
   const [kind, setKind] = useState<Kind>(initialKind);
@@ -101,7 +101,7 @@ function NewEntryForm({ open, onOpenChange, initialKind = "Transaction", initial
     const trimmed = payee.trim();
     if (kind !== "Transaction" || !trimmed || !attributes?.payees.includes(trimmed)) return;
     let cancelled = false;
-    apiGet<Entry | null>(`${ledgerPath(owner, slug)}/payees/${encodeURIComponent(trimmed)}/transaction`)
+    apiGet<Entry | null>(`${ledgerPath(workspace, slug)}/payees/${encodeURIComponent(trimmed)}/transaction`)
       .then((entry) => {
         if (cancelled || !entry?.postings) return;
         setPostings((current) => {
@@ -114,7 +114,7 @@ function NewEntryForm({ open, onOpenChange, initialKind = "Transaction", initial
     return () => {
       cancelled = true;
     };
-  }, [payee, kind, attributes, owner, slug, narration]);
+  }, [payee, kind, attributes, workspace, slug, narration]);
 
   const summary = useMemo(() => balanceSummary(postings), [postings]);
   const unbalanced = Object.entries(summary.byCurrency).filter(([, v]) => Math.abs(v) > 0.000001);

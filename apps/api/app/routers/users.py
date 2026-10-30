@@ -5,9 +5,17 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, Response
 from sqlalchemy import func, select
 
-from app.core.deps import AuthDep, DbDep, SessionUserDep, SettingsDep, UserDep, resolve_role
+from app.core.deps import AuthDep, DbDep, SessionUserDep, SettingsDep, UserDep
 from app.core.security import encrypt_secret, generate_ssh_keypair, verify_password
-from app.db.models import Ledger, LedgerRemote, LedgerStar, User, UserSshKey
+from app.db.models import (
+    Ledger,
+    LedgerRemote,
+    LedgerStar,
+    User,
+    UserSshKey,
+    Workspace,
+    WorkspaceMember,
+)
 from app.errors import ConflictError, NotFoundError, UnauthorizedError
 from app.ledgers.store import get_store
 from app.logging_setup import get_logger
@@ -44,15 +52,47 @@ async def update_me(body: UpdateProfileRequest, user: UserDep, db: DbDep):
 
 @router.delete("/me", status_code=204)
 async def delete_me(body: DeleteAccountRequest, user: SessionUserDep, db: DbDep):
+    """Workspaces where the person is alone go with the account; shared ones must keep an owner."""
     if not verify_password(body.password, user.password_hash):
         raise UnauthorizedError("Password is incorrect")
-    ledgers = (await db.execute(select(Ledger).where(Ledger.owner_id == user.id))).scalars().all()
+    memberships = (
+        await db.execute(
+            select(WorkspaceMember, Workspace)
+            .join(Workspace, Workspace.id == WorkspaceMember.workspace_id)
+            .where(WorkspaceMember.user_id == user.id)
+        )
+    ).all()
+    alone: list[Workspace] = []
+    for member, workspace in memberships:
+        others = (
+            await db.execute(
+                select(WorkspaceMember.user_id, WorkspaceMember.role).where(
+                    WorkspaceMember.workspace_id == workspace.id,
+                    WorkspaceMember.user_id != user.id,
+                )
+            )
+        ).all()
+        if not others:
+            alone.append(workspace)
+        elif member.role == "owner" and not any(role == "owner" for _, role in others):
+            raise ConflictError(
+                f"You are the only owner of the workspace '{workspace.name}'. "
+                "Make someone else an owner or delete it first."
+            )
     store = get_store()
-    for ledger in ledgers:
-        await store.delete(ledger.id)
+    for workspace in alone:
+        ledger_ids = (
+            (await db.execute(select(Ledger.id).where(Ledger.workspace_id == workspace.id)))
+            .scalars()
+            .all()
+        )
+        await store.delete_workspace(workspace.id, ledger_ids)
+        await db.delete(workspace)
     await db.delete(user)
     await db.commit()
-    log.info("user %s deleted their account", user.username)
+    log.info(
+        "user %s deleted their account (%d workspace(s) went with it)", user.username, len(alone)
+    )
     return Response(status_code=204)
 
 
@@ -91,13 +131,12 @@ async def delete_ssh_key(user: SessionUserDep, db: DbDep):
         await db.execute(
             select(func.count())
             .select_from(LedgerRemote)
-            .join(Ledger, Ledger.id == LedgerRemote.ledger_id)
-            .where(Ledger.owner_id == user.id, LedgerRemote.auth == "ssh_key")
+            .where(LedgerRemote.ssh_user_id == user.id, LedgerRemote.auth == "ssh_key")
         )
     ).scalar_one()
     if in_use:
         raise ConflictError(
-            f"{in_use} of your ledgers push with this key; disconnect their remotes first"
+            f"{in_use} ledger remote(s) push with this key; disconnect or reconnect them first"
         )
     await db.delete(row)
     await db.commit()
@@ -127,31 +166,6 @@ async def public_profile(username: str, db: DbDep, auth: AuthDep):
     ).scalar_one_or_none()
     if user is None:
         raise NotFoundError("User not found")
-    ledgers = (
-        (
-            await db.execute(
-                select(Ledger).where(Ledger.owner_id == user.id).order_by(Ledger.updated_at.desc())
-            )
-        )
-        .scalars()
-        .all()
-    )
-    visible = []
-    for ledger in ledgers:
-        role = await resolve_role(db, ledger, auth)
-        if role is None:
-            continue
-        visible.append(
-            {
-                "owner": user.username,
-                "slug": ledger.slug,
-                "title": ledger.title,
-                "description": ledger.description,
-                "visibility": ledger.visibility,
-                "starsCount": ledger.stars_count,
-                "updatedAt": ledger.updated_at,
-            }
-        )
     stars = (
         await db.execute(
             select(func.count()).select_from(LedgerStar).where(LedgerStar.user_id == user.id)
@@ -159,7 +173,6 @@ async def public_profile(username: str, db: DbDep, auth: AuthDep):
     ).scalar_one()
     return {
         "profile": PublicUserOut.model_validate(user).model_dump(by_alias=True),
-        "ledgers": visible,
         "starredCount": stars,
         "isSelf": auth.user is not None and auth.user.id == user.id,
     }

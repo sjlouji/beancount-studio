@@ -68,7 +68,72 @@ class User(TimestampMixin, Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     preferences: Mapped[dict] = mapped_column(JSON, default=dict)
 
-    ledgers: Mapped[list[Ledger]] = relationship(back_populates="owner")
+
+WORKSPACE_ROLES = ("owner", "admin", "member", "viewer")
+
+
+class Workspace(TimestampMixin, Base):
+    """The tenant: a team with its own ledgers, members and settings, addressed by slug."""
+
+    __tablename__ = "workspaces"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    slug: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(120))
+
+    # Deleting a workspace leaves the clean-up to the database's ON DELETE CASCADE, which is
+    # enforced on every connection (see app.db.base), so nothing here is loaded just to be removed.
+    members: Mapped[list[WorkspaceMember]] = relationship(
+        back_populates="workspace", cascade="all, delete-orphan", passive_deletes=True
+    )
+    invites: Mapped[list[WorkspaceInvite]] = relationship(
+        back_populates="workspace", cascade="all, delete-orphan", passive_deletes=True
+    )
+    ledgers: Mapped[list[Ledger]] = relationship(
+        back_populates="workspace", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class WorkspaceMember(Base):
+    __tablename__ = "workspace_members"
+
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    role: Mapped[str] = mapped_column(String(10))  # owner | admin | member | viewer
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=utcnow)
+
+    workspace: Mapped[Workspace] = relationship(back_populates="members")
+    user: Mapped[User] = relationship()
+
+
+class WorkspaceInvite(Base):
+    """A link that admits whoever presents it with the given role, until it expires or is revoked.
+
+    Only the token's hash is stored; the link itself is shown once, when the invite is created.
+    """
+
+    __tablename__ = "workspace_invites"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    role: Mapped[str] = mapped_column(String(10))  # admin | member | viewer
+    created_by_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    uses: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=utcnow)
+
+    workspace: Mapped[Workspace] = relationship(back_populates="invites")
+    created_by: Mapped[User | None] = relationship()
 
 
 class Session(Base):
@@ -93,10 +158,12 @@ class PasswordResetToken(Base):
 
 class Ledger(TimestampMixin, Base):
     __tablename__ = "ledgers"
-    __table_args__ = (UniqueConstraint("owner_id", "slug", name="uq_ledger_owner_slug"),)
+    __table_args__ = (UniqueConstraint("workspace_id", "slug", name="uq_ledger_workspace_slug"),)
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
     slug: Mapped[str] = mapped_column(String(80))
     title: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text, default="")
@@ -104,11 +171,9 @@ class Ledger(TimestampMixin, Base):
     main_file: Mapped[str] = mapped_column(String(255), default="main.bean")
     stars_count: Mapped[int] = mapped_column(Integer, default=0)
 
-    owner: Mapped[User] = relationship(back_populates="ledgers")
-    collaborators: Mapped[list[LedgerCollaborator]] = relationship(
-        back_populates="ledger", cascade="all, delete-orphan"
-    )
-    # Loaded with the ledger (one extra query per result set) so listings never do N+1.
+    # Both loaded with the ledger (one extra query per result set) so listings never do N+1:
+    # every response names the workspace, and writers see the remote.
+    workspace: Mapped[Workspace] = relationship(back_populates="ledgers", lazy="selectin")
     remote: Mapped[LedgerRemote | None] = relationship(
         back_populates="ledger", uselist=False, lazy="selectin", cascade="all, delete-orphan"
     )
@@ -129,6 +194,10 @@ class LedgerRemote(TimestampMixin, Base):
     transport: Mapped[str] = mapped_column(String(8))  # https | ssh | local
     auth: Mapped[str] = mapped_column(String(8))  # none | token | ssh_key
     token_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Whose SSH key pushes: the person who connected the remote. Cleared when they go.
+    ssh_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     branch: Mapped[str] = mapped_column(String(120))
     # in_sync | pushing | behind | diverged | error
     state: Mapped[str] = mapped_column(String(12), default="in_sync")
@@ -151,22 +220,6 @@ class UserSshKey(Base):
     private_key_ciphertext: Mapped[str] = mapped_column(Text)
     fingerprint: Mapped[str] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=utcnow)
-
-
-class LedgerCollaborator(Base):
-    __tablename__ = "ledger_collaborators"
-
-    ledger_id: Mapped[str] = mapped_column(
-        ForeignKey("ledgers.id", ondelete="CASCADE"), primary_key=True
-    )
-    user_id: Mapped[str] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    role: Mapped[str] = mapped_column(String(10), default="read")  # read | write | admin
-    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=utcnow)
-
-    ledger: Mapped[Ledger] = relationship(back_populates="collaborators")
-    user: Mapped[User] = relationship()
 
 
 class LedgerStar(Base):

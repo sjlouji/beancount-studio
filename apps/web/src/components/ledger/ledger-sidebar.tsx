@@ -3,13 +3,15 @@
 import { usePathname } from "next/navigation";
 import { SidebarFind, SidebarItem } from "@/components/app/sidebar-parts";
 import { Badge } from "@/components/ui/badge";
+import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher";
 import { useLedgerContext } from "./ledger-context";
 import { navItemIsActive, visibleItems, type LedgerNavSection } from "./ledger-nav";
 import { LedgerSwitcher } from "./ledger-switcher";
 
 /**
- * The sidebar inside a ledger: the switcher, a find field, the pages of the section picked in the
- * rail (Overview, Reports, Capture, Data or Repository), then the ledger's vital numbers.
+ * The sidebar inside a ledger: the workspace switcher over the ledger switcher, a find field, the
+ * pages of the section picked in the rail (Overview, Reports, Capture, Data or Repository), then
+ * the ledger's vital numbers.
  */
 export function LedgerSidebar({ section, onSearch }: { section: LedgerNavSection; onSearch: () => void }) {
   const { base, queryString, meta, ledger } = useLedgerContext();
@@ -19,6 +21,9 @@ export function LedgerSidebar({ section, onSearch }: { section: LedgerNavSection
   return (
     <>
       <div className="flex h-12 shrink-0 items-center px-2">
+        <WorkspaceSwitcher />
+      </div>
+      <div className="mb-1 flex shrink-0 items-center px-2">
         <LedgerSwitcher />
       </div>
       <SidebarFind label={`Find in ${ledger.title}…`} onOpen={onSearch} />

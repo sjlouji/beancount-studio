@@ -20,14 +20,11 @@ from app.logging_setup import get_logger
 from app.routers.reports import QueryDep
 
 log = get_logger(__name__)
-router = APIRouter(prefix="/ledgers/{owner}/{slug}", tags=["entries"])
+router = APIRouter(prefix="/workspaces/{workspace}/ledgers/{slug}", tags=["entries"])
 
 
 async def _run(access, fn, *args: Any, **kwargs: Any):
-    ledger = access.ledger
-    return await get_store().run(
-        ledger.id, lambda fava: fn(fava, *args, **kwargs), ledger.main_file
-    )
+    return await get_store().run(access.ledger, lambda fava: fn(fava, *args, **kwargs))
 
 
 # ------------------------------------------------------------------- journal
@@ -106,14 +103,13 @@ class SliceUpdate(BaseModel):
 async def update_entry(entry_hash: str, body: SliceUpdate, access: LedgerWriteDep):
     store = get_store()
     ledger = access.ledger
-    async with store.write_lock(ledger.id):
+    async with store.write_lock(ledger):
         new_sha = await store.run(
-            ledger.id,
+            ledger,
             lambda fava: engine.save_slice(fava, entry_hash, body.source, body.sha256sum),
-            ledger.main_file,
         )
         commit = await store.commit(
-            ledger.id, body.message or f"Edit entry {entry_hash[:8]}", author_for(access.auth.user)
+            ledger, body.message or f"Edit entry {entry_hash[:8]}", author_for(access.auth.user)
         )
     return {"sha256sum": new_sha, "commit": commit}
 
@@ -127,14 +123,10 @@ class SliceDelete(BaseModel):
 async def delete_entry(entry_hash: str, body: SliceDelete, access: LedgerWriteDep):
     store = get_store()
     ledger = access.ledger
-    async with store.write_lock(ledger.id):
-        await store.run(
-            ledger.id,
-            lambda fava: engine.delete_slice(fava, entry_hash, body.sha256sum),
-            ledger.main_file,
-        )
+    async with store.write_lock(ledger):
+        await store.run(ledger, lambda fava: engine.delete_slice(fava, entry_hash, body.sha256sum))
         commit = await store.commit(
-            ledger.id,
+            ledger,
             body.message or f"Delete entry {entry_hash[:8]}",
             author_for(access.auth.user),
         )
@@ -371,17 +363,15 @@ async def add_entries(body: AddEntriesRequest, access: LedgerWriteDep):
     store = get_store()
     ledger = access.ledger
     directives = [build_entry(item) for item in body.entries]
-    async with store.write_lock(ledger.id):
-        hashes = await store.run(
-            ledger.id, lambda fava: engine.insert_entries(fava, directives), ledger.main_file
-        )
+    async with store.write_lock(ledger):
+        hashes = await store.run(ledger, lambda fava: engine.insert_entries(fava, directives))
         label = body.message or (
             f"Add {len(directives)} entries"
             if len(directives) > 1
             else f"Add {directives[0].__class__.__name__.lower()}"
         )
-        commit = await store.commit(ledger.id, label, author_for(access.auth.user))
-        check = await store.run(ledger.id, engine.errors, ledger.main_file)
+        commit = await store.commit(ledger, label, author_for(access.auth.user))
+        check = await store.run(ledger, engine.errors)
     return {"entryHashes": hashes, "commit": commit, "errors": check}
 
 

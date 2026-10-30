@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ledgerPath, useOptions } from "@/lib/api/hooks";
 
-export function ExportCard({ owner, slug }: { owner: string; slug: string }) {
+export function ExportCard({ workspace, slug }: { workspace: string; slug: string }) {
   return (
     <Card className="animate-rise [animation-delay:120ms]">
       <CardHeader>
@@ -17,7 +17,7 @@ export function ExportCard({ owner, slug }: { owner: string; slug: string }) {
       </CardHeader>
       <CardFooter className="border-t">
         <Button asChild variant="outline">
-          <a href={`/api${ledgerPath(owner, slug)}/archive`} download={`${slug}.zip`}>
+          <a href={`/api${ledgerPath(workspace, slug)}/archive`} download={`${slug}.zip`}>
             <DownloadIcon data-icon="inline-start" /> Download archive (.zip)
           </a>
         </Button>
@@ -55,8 +55,8 @@ function OptionsTable({ title, options }: { title: string; options: Record<strin
   );
 }
 
-export function OptionsCard({ owner, slug }: { owner: string; slug: string }) {
-  const options = useOptions(owner, slug);
+export function OptionsCard({ workspace, slug }: { workspace: string; slug: string }) {
+  const options = useOptions(workspace, slug);
   return (
     <Collapsible asChild>
       <Card className="animate-rise [animation-delay:160ms]">
