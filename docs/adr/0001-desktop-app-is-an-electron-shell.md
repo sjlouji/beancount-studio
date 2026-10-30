@@ -58,7 +58,8 @@ hardened window. It does not bundle the web client and it does not embed the API
 
 1. Code signing and notarization in CI (Developer ID certificate, Apple API key), auto-update
    from GitHub Releases, app icon.
-2. Deep links (`beancount-studio://…`) and native notifications wired to the web client.
+2. Native notifications wired to the web client. (Deep links landed with the workspace model:
+   ADR 0003, phase 5.)
 3. Multi-server sidebar, drag a receipt or statement onto the dock icon, menu bar quick-add.
-4. Desktop awareness in the web client (title-bar layout, native notification preference) using
-   the bridge.
+4. More desktop awareness in the web client (title-bar layout, native notification preference)
+   using the bridge, which now carries the workspaces to the shell's menus.

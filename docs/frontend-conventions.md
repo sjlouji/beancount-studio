@@ -9,21 +9,29 @@ Next.js 16 App Router · React 19 · TypeScript · Tailwind v4 · shadcn/ui (rad
 
 ```
 src/app/(auth)/…                      login, sign-up, forgot/reset password
-src/app/(app)/(home)/…                /ledgers, /settings/*, /u/[username]   (AppFrame + HomeSidebar)
-src/app/(app)/ledger/[owner]/[slug]/… every ledger page                                  (AppFrame + rail sections + LedgerSidebar, header tabs, Ask panel)
+src/app/page.tsx                      `/` opens the workspace used last, or /new when there is none yet
+src/app/new/…                         onboarding: create a workspace, its first ledger, invite people     (FocusShell)
+src/app/invite/[token]/…              accept an invite link; public, works before signing in            (FocusShell)
+src/app/(app)/w/[workspace]/(pages)/… workspace home and /settings (members, invite links, leave, delete) (WorkspaceFrame)
+src/app/(app)/w/[workspace]/[slug]/…  every ledger page                                                  (AppFrame + rail sections + LedgerSidebar, header tabs, Ask panel)
+src/app/(app)/(home)/…                /settings/*, /u/[username]                                        (WorkspaceFrame)
 src/components/ui/*                   shadcn primitives, restyled to DESIGN.md (tokens only; keep their APIs)
 src/components/assistant-ui/*         assistant-ui registry components (do not edit)
-src/components/app/*                  the frame (AppFrame, Rail, TopBar, ContentHeader, MobileTabBar, HomeSidebar, sidebar-parts, home-search), PageHeader, states, Amount, theme toggle, user menu, command palette
+src/components/app/*                  the frame (AppFrame, Rail, TopBar, ContentHeader, MobileTabBar, sidebar-parts, home-search), FocusShell, PageHeader, states, Amount, theme toggle, user menu, command palette
+src/components/workspace/*            workspace pieces: switcher, sidebar, WorkspaceFrame, WorkspaceGate, members and invite-link cards, settings cards, ledger card, role and slug rules, useCurrentWorkspace()
 src/components/ledger/*               ledger pieces: context (incl. the Ask panel state), shell, sidebar, ledger-nav (one table of pages), ask-panel, filter bar, hierarchy table, entry cards/sheet, diff view, dialogs
 src/components/charts/*               Recharts wrappers + chart primitives (palette, tooltip, legend)
 src/lib/api/client.ts                 api(), apiGet/apiPost/apiPut/apiPatch/apiDelete, ApiError, errorMessage()
 src/lib/api/types.ts                  every API response type
-src/lib/api/hooks.ts                  TanStack Query hooks (useOverview, useJournal, useFileTree, …) + `keys` + ledgerPath()
+src/lib/api/hooks.ts                  TanStack Query hooks (useOverview, useJournal, useFileTree, useWorkspaces, useMembers, …) + `keys` + ledgerPath()/workspacePath() (API paths)
+src/lib/routes.ts                     workspaceHref()/ledgerHref() (web addresses), safeNext(), the workspace remembered per browser
 src/lib/format.ts                     formatNumber/formatAmount/formatCompact/formatDate/formatRelative/accountLeaf/…
 ```
 
-The Python API is proxied at `/api/*` (same origin, cookie auth). All ledger endpoints are under
-`/api/ledgers/{owner}/{slug}/…` — see `apps/api/app/routers/*.py` for the exact routes and
+The Python API is proxied at `/api/*` (same origin, cookie auth). Ledgers belong to workspaces,
+so every ledger endpoint is under `/api/workspaces/{workspace}/ledgers/{slug}/…` (build it with
+`ledgerPath(workspace, slug)`); workspace membership and invites live under
+`/api/workspaces/{workspace}/…`. See `apps/api/app/routers/*.py` for the exact routes and
 `apps/api/app/ledgers/engine.py` for report payload shapes (mirrored in `types.ts`).
 
 ## Page skeleton
@@ -38,8 +46,8 @@ import { useLedgerContext } from "@/components/ledger/ledger-context";
 import { useIncomeStatement } from "@/lib/api/hooks";
 
 export default function Page() {
-  const { owner, slug, params, conversion, precisions, invert, base, queryString, canWrite } = useLedgerContext();
-  const query = useIncomeStatement(owner, slug, { ...params, conversion });
+  const { workspace, slug, params, conversion, precisions, invert, base, queryString, canWrite } = useLedgerContext();
+  const query = useIncomeStatement(workspace, slug, { ...params, conversion });
   if (query.isPending) return <CardSkeleton rows={8} />;
   if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   return (
@@ -55,7 +63,7 @@ export default function Page() {
   filter bar in the header already edits them. Pass `{ ...params, conversion }` to report hooks.
 - `href(path, extra?)` / `queryString` keep the shared filters when linking between ledger pages.
   Use `accountHref(base, account, queryString)` for account links.
-- Writes: use the mutation hooks (`useAddEntries`, `useUpdateEntry`, …) or `apiPost` + `useInvalidateLedger(owner, slug)()` afterwards. Show `toast.success/error` (sonner) with `errorMessage(err)`.
+- Writes: use the mutation hooks (`useAddEntries`, `useUpdateEntry`, …) or `apiPost` + `useInvalidateLedger(workspace, slug)()` afterwards. Show `toast.success/error` (sonner) with `errorMessage(err)`.
 - Gate write UI on `canWrite`.
 - Dynamic route params in pages: `({ params }: { params: Promise<{ account: string }> })` + `use(params)`.
   Account names in URLs are `encodeURIComponent` per segment joined with `:`; decode with `decodeURIComponent`.
@@ -67,6 +75,9 @@ export default function Page() {
 | Page title block | `PageHeader` (eyebrow/title/description/actions) |
 | Loading / error / empty | `PageSkeleton` (route `loading.tsx`), `CardSkeleton`, `ListSkeleton`, `LoadingState`, `ErrorState`, `EmptyState` from `components/app/states` |
 | A new ledger page (rail section, sidebar, header tabs, palette) | add it to `LEDGER_SECTIONS` in `components/ledger/ledger-nav.ts`; nothing else to wire |
+| The current workspace on any page | `useCurrentWorkspace()` from `components/workspace/use-current-workspace` (the URL segment, else the one opened last); `canWrite(role)` / `canAdminister(role)` from `components/workspace/rules` |
+| A page that needs the workspace loaded | wrap it in `WorkspaceGate` (renders the sign-in, loading, error and not-a-member states, then calls you with the workspace) |
+| Links to workspaces and ledgers | `workspaceHref(slug)` and `ledgerHref(workspace, slug)` from `lib/routes`; never build `/w/…` by hand |
 | Sidebar rows and sections | `SidebarItem`, `SidebarSection`, `SidebarFind`, `LedgerTile` from `components/app/sidebar-parts` |
 | Opening the assistant | `openAsk()` from `useLedgerContext()`; the rail and the phone tab bar call it |
 | Amounts | `Amount` (single) and `BalanceAmounts` (map of unit → number) — `precisions` from context, `invert` for income/liabilities/equity when `invert` is true, `colored` for sign colours |
@@ -86,7 +97,10 @@ export default function Page() {
   tab bar. Pages render inside the content column and never add their own chrome. Ledger pages
   get the `ContentHeader` (title, route-derived tabs, filter toolbar) and the `AskPanel` beside them.
   Inside a ledger the rail carries the sections and the sidebar the current section's pages; the
-  phone sheet shows rail and sidebar side by side.
+  phone sheet shows rail and sidebar side by side. Every sidebar starts with the
+  `WorkspaceSwitcher` (Slack's workspace name with a menu); a ledger sidebar adds the
+  `LedgerSwitcher` row under it. Focused tasks outside the frame (onboarding, invites) use
+  `FocusShell`.
 - The frame's scroll containers (content column, sidebars) are `relative`. Absolutely positioned
   content such as `sr-only` labels and dialog headers is then clipped by the scroller instead of
   landing in document coordinates and making the whole page scroll under the frame.

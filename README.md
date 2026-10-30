@@ -34,7 +34,7 @@ assistant whose edits are shown as diffs and committed only after you approve th
 | Receipts | Upload a photo or PDF; the model extracts date, payee, total and currency and suggests accounts; the file is stored next to the ledger and linked from the transaction. |
 | Assistant | Chat with your ledger: BQL queries, reports, file reads and searches. Edits go through an approval card showing the diff and bean-check result. Threads are kept per ledger. |
 | Data pages | Accounts (tree and table, open and close), commodities and price charts, documents with previews, events timeline, errors with jump-to-line, a BQL workbench with sortable results and CSV download. |
-| Accounts and sharing | Email and password accounts (the first user is the administrator), public or private ledgers, per-ledger collaborators with read, write or admin roles, stars, personal access tokens with read and write scopes, password reset by email when SMTP is configured. |
+| Accounts and sharing | Email and password accounts (the first user is the administrator), workspaces that own ledgers with owner, admin, member and viewer roles, self-serve onboarding (create a workspace, its first ledger and invite links in three steps), invite links that work before signing up, public or private ledgers, stars, personal access tokens with read and write scopes, password reset by email when SMTP is configured. |
 
 ## What you get
 
@@ -42,7 +42,8 @@ assistant whose edits are shown as diffs and committed only after you approve th
   Ledger content never enters the database.
 - **Production on a laptop.** One command starts PostgreSQL, the API, the web app and Caddy
   with HTTPS. The same images and layout run on a server with a public certificate.
-- **A Mac app** that connects to your server and remembers it.
+- **A Mac app** that connects to your server and remembers it, switches workspaces with ⌘1 to ⌘9
+  and opens `beancount-studio://` links.
 - **An HTTP API** for everything the interface does, with personal access tokens.
 - **Your choice of model, or none.** The assistant, receipt scanning and categorisation run
   with an Anthropic key or with an open-source model served by Ollama, vLLM, LM Studio or any
@@ -55,6 +56,7 @@ assistant whose edits are shown as diffs and committed only after you approve th
 git clone https://github.com/sjlouji/beancount-studio.git beancount-studio && cd beancount-studio
 ./studio.sh local          # production images on this machine → https://localhost:8443
 ./studio.sh local trust    # once per machine: trust the local certificate
+./studio.sh local backup   # one archive with the database and every ledger; restore and update exist too
 ```
 
 Open the address and create the first account; it becomes the administrator. The full steps,

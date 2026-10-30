@@ -97,6 +97,11 @@ pnpm test       # tsc + node:test
 `packages/desktop-bridge`; the shell consumes it through a `link:` dependency until the
 repository becomes a pnpm workspace ([ADR 0002](adr/0002-repository-layout.md)).
 
+The Workspace menu works in a development build. `beancount-studio://` links do not: only a
+packaged app registers the scheme with macOS. Editor terminals (VS Code among them) export
+`ELECTRON_RUN_AS_NODE=1`, which makes Electron start as plain Node and the main process crash
+on its first `ipcMain` call; run `env -u ELECTRON_RUN_AS_NODE pnpm dev` from such a terminal.
+
 ## Where things live
 
 - `apps/api/app/ledgers/store.py` — ledger git repositories and the cached Fava engine; all
