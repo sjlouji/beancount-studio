@@ -147,7 +147,7 @@ function ConnectRemoteCard({ ledger }: { ledger: Ledger }) {
   };
 
   return (
-    <Card className="animate-rise [animation-delay:120ms]">
+    <Card className="animate-rise [animation-delay:60ms]">
       <form onSubmit={onSubmit}>
         <CardHeader>
           <CardTitle className="text-sm font-medium">Remote repository</CardTitle>
@@ -216,7 +216,7 @@ function ConnectedRemoteCard({ ledger, remote }: { ledger: Ledger; remote: Ledge
     });
 
   return (
-    <Card className="animate-rise [animation-delay:120ms]">
+    <Card className="animate-rise [animation-delay:60ms]">
       <CardHeader>
         <CardTitle className="text-sm font-medium">Remote repository</CardTitle>
         <CardDescription>Every change made here is pushed to this repository. Sync brings in commits made elsewhere.</CardDescription>

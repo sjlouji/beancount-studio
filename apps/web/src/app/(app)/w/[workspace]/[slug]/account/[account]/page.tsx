@@ -43,7 +43,7 @@ export default function AccountPage({ params: routeParams }: { params: Promise<{
   if (report.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Account" title={<span className="font-mono text-2xl md:text-3xl">{account}</span>} />
+        <PageHeader title={<span className="font-mono text-2xl md:text-3xl">{account}</span>} />
         <CardSkeleton rows={8} />
         <CardSkeleton rows={4} />
       </div>
@@ -78,7 +78,7 @@ export default function AccountPage({ params: routeParams }: { params: Promise<{
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Account"
+       
         title={<span className="font-mono text-2xl break-all md:text-3xl">{account}</span>}
         description={description}
         actions={
@@ -103,7 +103,7 @@ export default function AccountPage({ params: routeParams }: { params: Promise<{
       />
 
       <ChartTabsCard
-        className="animate-rise [animation-delay:80ms]"
+        className="animate-rise [animation-delay:40ms]"
         title={accountLeaf(account)}
         tabs={[
           {
@@ -127,10 +127,10 @@ export default function AccountPage({ params: routeParams }: { params: Promise<{
         ]}
       />
 
-      <div className="animate-rise [animation-delay:120ms]">
+      <div className="animate-rise [animation-delay:60ms]">
         <AccountPeriodTable report={data} interval={interval} inverted={inverted} />
       </div>
-      <div className="animate-rise [animation-delay:160ms]">
+      <div className="animate-rise [animation-delay:80ms]">
         <AccountJournalCard account={account} inverted={inverted} />
       </div>
 

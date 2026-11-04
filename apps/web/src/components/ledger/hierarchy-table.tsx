@@ -1,10 +1,10 @@
 "use client";
 
-import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { BalanceAmounts } from "@/components/app/amount";
 import { Button } from "@/components/ui/button";
+import { Treegrid, TreegridCell, TreegridRow, TreegridToggle } from "@/components/ui/treegrid";
 import type { Balance, TreeNode } from "@/lib/api/types";
 import { accountLeaf } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -61,23 +61,23 @@ export function HierarchyTable({
   });
 
   const rows = useMemo(() => {
-    const out: Array<{ node: TreeNode; level: number; hasChildren: boolean }> = [];
-    const walk = (node: TreeNode, level: number) => {
+    const out: Array<{ node: TreeNode; level: number; hasChildren: boolean; posinset: number; setsize: number }> = [];
+    const walk = (node: TreeNode, level: number, posinset: number, setsize: number) => {
       const children = node.children.filter((c) => showZero || hasValue(c.balanceChildren) || c.hasTxns);
-      if (!(hideRoot && level === 0)) out.push({ node, level, hasChildren: children.length > 0 });
+      if (!(hideRoot && level === 0)) out.push({ node, level, hasChildren: children.length > 0, posinset, setsize });
       if (expanded.has(node.account) || (hideRoot && level === 0)) {
-        for (const child of children) walk(child, hideRoot ? level : level + 1);
+        children.forEach((child, index) => walk(child, hideRoot ? level : level + 1, index + 1, children.length));
       }
     };
-    walk(root, 0);
+    walk(root, 0, 1, 1);
     return out;
   }, [root, expanded, hideRoot, showZero]);
 
-  const toggle = (account: string) =>
+  const setOpen = (account: string, open: boolean) =>
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(account)) next.delete(account);
-      else next.add(account);
+      if (open) next.add(account);
+      else next.delete(account);
       return next;
     });
 
@@ -104,50 +104,57 @@ export function HierarchyTable({
           </Button>
         </div>
       </header>
-      <table className="w-full text-sm" aria-labelledby={headingId}>
+      <Treegrid aria-labelledby={headingId}>
         <thead className="sr-only">
-          <tr>
-            <th scope="col">Account</th>
-            <th scope="col">Balance</th>
+          <tr role="row">
+            <th scope="col" role="columnheader">
+              Account
+            </th>
+            <th scope="col" role="columnheader">
+              Balance
+            </th>
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ node, level, hasChildren }) => {
-            const isOpen = expanded.has(node.account);
+          {rows.map(({ node, level, hasChildren, posinset, setsize }) => {
+            const isOpen = hasChildren ? expanded.has(node.account) : undefined;
             const own = hasValue(node.balance);
+            const onOpenChange = (open: boolean) => setOpen(node.account, open);
             return (
-              <tr key={node.account} className={cn("group border-b last:border-0 hover:bg-muted/40", level === 0 && "bg-surface/60 font-medium")}>
-                <th scope="row" className="py-1.5 pr-3 pl-3 text-left font-normal" style={{ paddingLeft: `${0.75 + level * 1.1}rem` }}>
+              <TreegridRow
+                key={node.account}
+                level={level + 1}
+                posinset={posinset}
+                setsize={setsize}
+                expanded={isOpen}
+                onExpandedChange={onOpenChange}
+                className={cn("group border-b last:border-0 hover:bg-muted/40", level === 0 && "bg-surface/60 font-medium")}
+              >
+                <TreegridCell rowHeader className="py-1.5 pr-3 pl-3 text-left font-normal" style={{ paddingLeft: `${0.75 + level * 1.1}rem` }}>
                   <span className="flex items-center gap-1">
-                    {hasChildren ? (
-                      <button type="button" onClick={() => toggle(node.account)} aria-expanded={isOpen} aria-label={isOpen ? "Collapse" : "Expand"} className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                        <ChevronRightIcon className={cn("size-3.5 transition-transform", isOpen && "rotate-90")} />
-                      </button>
-                    ) : (
-                      <span className="inline-block size-4.5" />
-                    )}
+                    <TreegridToggle expanded={isOpen} onExpandedChange={onOpenChange} label={node.account} />
                     <Link href={accountHref(base, node.account, queryString)} className={cn("truncate font-mono text-[13px] hover:underline", level === 0 && "font-sans text-sm font-medium")}>
                       {level === 0 ? node.account : accountLeaf(node.account)}
                     </Link>
-                    {hasChildren && !isOpen && own && <span className="text-[10px] text-muted-foreground">+own</span>}
+                    {isOpen === false && own && <span className="text-[10px] text-muted-foreground">+own</span>}
                   </span>
-                </th>
-                <td className="py-1.5 pr-4 text-right">
-                  <BalanceAmounts balance={isOpen && hasChildren ? node.balance : node.balanceChildren} precisions={precisions} invert={invert} emptyLabel="" />
-                </td>
-              </tr>
+                </TreegridCell>
+                <TreegridCell className="py-1.5 pr-4 text-right">
+                  <BalanceAmounts balance={isOpen ? node.balance : node.balanceChildren} precisions={precisions} invert={invert} emptyLabel="" />
+                </TreegridCell>
+              </TreegridRow>
             );
           })}
           {summaryRows.map((row) => (
-            <tr key={row.label} className={cn("border-t bg-surface/60", row.emphasis && "font-semibold")}>
-              <td className="py-2 pl-3 text-sm">{row.label}</td>
-              <td className="py-2 pr-4 text-right">
+            <TreegridRow key={row.label} className={cn("border-t bg-surface/60", row.emphasis && "font-semibold")}>
+              <TreegridCell className="py-2 pl-3 text-sm">{row.label}</TreegridCell>
+              <TreegridCell className="py-2 pr-4 text-right">
                 <BalanceAmounts balance={row.balance} precisions={precisions} invert={invert} colored={row.emphasis} />
-              </td>
-            </tr>
+              </TreegridCell>
+            </TreegridRow>
           ))}
         </tbody>
-      </table>
+      </Treegrid>
     </section>
   );
 }

@@ -1,16 +1,11 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useReportParams } from "@/hooks/use-report-params";
 import { useLedgerAttributes, useLedgerMeta } from "@/lib/api/hooks";
 import type { Ledger, LedgerAttributes, LedgerMeta, ReportParams } from "@/lib/api/types";
 
 /** The assistant panel beside the content: open or not, and which conversation. */
-export interface AskState {
-  open: boolean;
-  threadId: string | null;
-}
-
 export interface LedgerContextValue {
   workspace: string;
   slug: string;
@@ -31,10 +26,6 @@ export interface LedgerContextValue {
   invert: boolean;
   /** Link to a ledger page, carrying the shared filters. */
   href: (path: string, extra?: Record<string, string | undefined>) => string;
-  ask: AskState;
-  openAsk: () => void;
-  closeAsk: () => void;
-  setAskThread: (threadId: string | null) => void;
 }
 
 const LedgerContext = createContext<LedgerContextValue | null>(null);
@@ -50,11 +41,7 @@ export function LedgerProvider({ workspace, slug, ledger, children }: { workspac
   const { data: attributes } = useLedgerAttributes(workspace, slug);
   const { params, setParams, clear, queryString, hasFilters } = useReportParams();
   const base = `/w/${workspace}/${slug}`;
-  const [ask, setAsk] = useState<AskState>({ open: false, threadId: null });
 
-  const openAsk = useCallback(() => setAsk((s) => ({ ...s, open: true })), []);
-  const closeAsk = useCallback(() => setAsk((s) => ({ ...s, open: false })), []);
-  const setAskThread = useCallback((threadId: string | null) => setAsk((s) => ({ ...s, threadId })), []);
 
   const value = useMemo<LedgerContextValue>(() => {
     const conversion = params.conversion || meta?.operatingCurrencies[0] || "at_cost";
@@ -83,12 +70,8 @@ export function LedgerProvider({ workspace, slug, ledger, children }: { workspac
         const text = search.toString();
         return `${base}${path}${text ? `?${text}` : ""}`;
       },
-      ask,
-      openAsk,
-      closeAsk,
-      setAskThread,
     };
-  }, [workspace, slug, base, ledger, meta, attributes, params, setParams, clear, queryString, hasFilters, ask, openAsk, closeAsk, setAskThread]);
+  }, [workspace, slug, base, ledger, meta, attributes, params, setParams, clear, queryString, hasFilters]);
 
   return <LedgerContext.Provider value={value}>{children}</LedgerContext.Provider>;
 }

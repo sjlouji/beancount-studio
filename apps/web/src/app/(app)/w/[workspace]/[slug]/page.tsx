@@ -60,7 +60,7 @@ export default function OverviewPage() {
   if (overview.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow={`${ctx.workspace}/${ctx.slug}`} title="Overview" />
+        <PageHeader title="Overview" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <CardSkeleton key={i} rows={1} />
@@ -76,7 +76,7 @@ export default function OverviewPage() {
   if (data.transactionsCount === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow={`${ctx.workspace}/${ctx.slug}`} title="Overview" description={ctx.ledger.description} />
+        <PageHeader title="Overview" description={ctx.ledger.description} />
         <EmptyState
           title="This ledger has no transactions yet"
           description="Add your first transaction, import a bank statement, or ask the assistant to set things up."
@@ -105,7 +105,7 @@ export default function OverviewPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Overview"
+       
         title={ctx.ledger.title}
         description={ctx.ledger.description || periodLabel}
         actions={
@@ -121,13 +121,13 @@ export default function OverviewPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Net worth" value={latest(data.netWorthAtValue, unit)} unit={unit} hint={`at market value · ${data.netWorth.length ? formatDate(data.netWorth[data.netWorth.length - 1]!.date) : ""}`} />
-        <StatTile label="Income" value={income} unit={unit} hint={periodLabel} delay={40} />
-        <StatTile label="Expenses" value={expenses} unit={unit} hint={lastInterval ? `${formatCompact(lastInterval.balance[unit ?? ""] ?? 0)} ${unit} in the latest ${interval}` : undefined} delay={80} />
-        <StatTile label="Saved" value={net} unit={unit} hint={income > 0 ? `${savingsRate.toFixed(0)}% savings rate` : "No income in scope"} tone={net >= 0 ? "positive" : "negative"} delay={120} />
+        <StatTile label="Income" value={income} unit={unit} hint={periodLabel} delay={20} />
+        <StatTile label="Expenses" value={expenses} unit={unit} hint={lastInterval ? `${formatCompact(lastInterval.balance[unit ?? ""] ?? 0)} ${unit} in the latest ${interval}` : undefined} delay={40} />
+        <StatTile label="Saved" value={net} unit={unit} hint={income > 0 ? `${savingsRate.toFixed(0)}% savings rate` : "No income in scope"} tone={net >= 0 ? "positive" : "negative"} delay={60} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <Card className="animate-rise lg:col-span-3 [animation-delay:160ms]">
+        <Card className="animate-rise lg:col-span-3 [animation-delay:80ms]">
           <CardContent>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-medium">Net worth</h2>
@@ -147,7 +147,7 @@ export default function OverviewPage() {
             />
           </CardContent>
         </Card>
-        <Card className="animate-rise lg:col-span-2 [animation-delay:200ms]">
+        <Card className="animate-rise lg:col-span-2 [animation-delay:80ms]">
           <CardContent>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-medium">Income vs. expenses</h2>
@@ -161,7 +161,7 @@ export default function OverviewPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <Card className="animate-rise lg:col-span-3 [animation-delay:240ms]">
+        <Card className="animate-rise lg:col-span-3 [animation-delay:80ms]">
           <CardContent>
             <Tabs defaultValue="expenses">
               <div className="mb-2 flex items-center justify-between">
@@ -190,7 +190,7 @@ export default function OverviewPage() {
             </Tabs>
           </CardContent>
         </Card>
-        <Card className="animate-rise lg:col-span-2 [animation-delay:280ms]">
+        <Card className="animate-rise lg:col-span-2 [animation-delay:80ms]">
           <CardContent>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-medium">Monthly expenses by category</h2>
@@ -201,7 +201,7 @@ export default function OverviewPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <Card className="animate-rise lg:col-span-3 [animation-delay:320ms]">
+        <Card className="animate-rise lg:col-span-3 [animation-delay:80ms]">
           <CardContent>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-medium">Recent transactions</h2>
@@ -217,7 +217,7 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
         <div className="space-y-4 lg:col-span-2">
-          <Card className="animate-rise [animation-delay:360ms]">
+          <Card className="animate-rise [animation-delay:80ms]">
             <CardContent>
               <h2 className="mb-2 text-sm font-medium">Balances</h2>
               <dl className="divide-y text-sm">
@@ -250,7 +250,7 @@ export default function OverviewPage() {
             </CardContent>
           </Card>
           {data.upcomingEvents.length > 0 && (
-            <Card className="animate-rise [animation-delay:400ms]">
+            <Card className="animate-rise [animation-delay:80ms]">
               <CardContent>
                 <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
                   <CalendarDaysIcon className="size-4" /> Upcoming events

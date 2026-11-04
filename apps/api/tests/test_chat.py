@@ -143,6 +143,143 @@ async def test_chat_streams_text_and_runs_backend_tool(
     assert stored["title"] == "How much on food?"
 
 
+async def _ask_for_document(client: AsyncClient, ledger: dict, fake_ai, tool_input: dict) -> dict:
+    """Runs one chat turn whose model calls create_document; returns the stored tool call."""
+    base = f"/api/workspaces/{ledger['workspace']}/ledgers/{ledger['slug']}/chat"
+    thread = (await client.post(f"{base}/threads")).json()
+    fake_ai(
+        [
+            {
+                "text": "Here it is.",
+                "tool": {"id": "toolu_doc", "name": "create_document", "input": tool_input},
+            },
+            {"text": "Done."},
+        ]
+    )
+    res = await client.post(
+        base,
+        json={
+            "threadId": thread["id"],
+            "messages": [
+                {"role": "user", "content": [{"type": "text", "text": "Make a spreadsheet"}]}
+            ],
+            "tools": {},
+        },
+    )
+    assert res.status_code == 200, res.text
+    stored = (await client.get(f"{base}/threads/{thread['id']}")).json()
+    return next(part for part in stored["messages"][1]["content"] if part["type"] == "tool-call")
+
+
+async def test_assistant_makes_a_document_from_ledger_queries(
+    client: AsyncClient, user: dict, ledger: dict, fake_ai
+):
+    call = await _ask_for_document(
+        client,
+        ledger,
+        fake_ai,
+        {
+            "format": "xlsx",
+            "title": "Food spending",
+            "body": "# Food\n\nAll food accounts.",
+            "tables": [
+                {
+                    "title": "By account",
+                    "query": "SELECT account, sum(position) WHERE account ~ 'Food' GROUP BY account",
+                }
+            ],
+        },
+    )
+    document = call["result"]["document"]
+    assert document["filename"] == "Food spending.xlsx"
+    assert document["format"] == "xlsx"
+    assert call["result"]["tables"][0]["rowCount"] >= 1
+
+    download = await client.get(document["url"])
+    assert download.status_code == 200
+    assert download.content[:2] == b"PK"  # an .xlsx is a zip archive
+
+    # Only its owner can fetch it.
+    other = await client.post(
+        "/api/auth/sign-up",
+        json={
+            "email": "outsider@example.com",
+            "username": "outsider",
+            "password": "correct-horse-battery",
+        },
+    )
+    assert other.status_code == 201, other.text
+    assert (await client.get(document["url"])).status_code == 404
+
+
+async def test_the_files_list_holds_the_documents_with_their_conversation(
+    client: AsyncClient, user: dict, ledger: dict, fake_ai
+):
+    call = await _ask_for_document(
+        client,
+        ledger,
+        fake_ai,
+        {"format": "html", "title": "Overview", "body": "Hello"},
+    )
+    base = f"/api/workspaces/{ledger['workspace']}/ledgers/{ledger['slug']}/chat"
+    files = (await client.get(f"{base}/files")).json()
+    assert [f["id"] for f in files] == [call["result"]["document"]["id"]]
+    assert files[0]["filename"] == "Overview.html"
+    assert files[0]["threadTitle"] == "Make a spreadsheet"
+    assert files[0]["url"] == call["result"]["document"]["url"]
+
+
+async def test_starring_and_renaming_keep_a_conversation_in_place(
+    client: AsyncClient, user: dict, ledger: dict
+):
+    base = f"/api/workspaces/{ledger['workspace']}/ledgers/{ledger['slug']}/chat"
+    thread = (await client.post(f"{base}/threads")).json()
+    assert thread["pinned"] is False
+
+    starred = await client.patch(f"{base}/threads/{thread['id']}", json={"pinned": True})
+    assert starred.status_code == 200, starred.text
+    assert starred.json()["pinned"] is True and starred.json()["pinnedAt"]
+    assert starred.json()["updatedAt"] == thread["updatedAt"]
+
+    renamed = (
+        await client.patch(f"{base}/threads/{thread['id']}", json={"title": "  Taxes  "})
+    ).json()
+    assert (renamed["title"], renamed["pinned"], renamed["updatedAt"]) == (
+        "Taxes",
+        True,
+        thread["updatedAt"],
+    )
+
+    listed = next(
+        t for t in (await client.get(f"{base}/threads")).json() if t["id"] == thread["id"]
+    )
+    assert listed["pinned"] is True
+
+    unstarred = (
+        await client.patch(f"{base}/threads/{thread['id']}", json={"pinned": False})
+    ).json()
+    assert unstarred["pinned"] is False and unstarred["pinnedAt"] is None
+
+    assert (await client.patch(f"{base}/threads/{thread['id']}", json={})).status_code == 422
+
+
+async def test_a_document_with_a_bad_query_fails_loudly(
+    client: AsyncClient, user: dict, ledger: dict, fake_ai
+):
+    call = await _ask_for_document(
+        client,
+        ledger,
+        fake_ai,
+        {
+            "format": "pdf",
+            "title": "Broken",
+            "tables": [{"title": "Nope", "query": "SELEKT nothing"}],
+        },
+    )
+    assert "document" not in call["result"]
+    assert "Nope" in call["result"]["error"]
+
+
 async def test_edit_requires_approval_then_commits(
     client: AsyncClient, user: dict, ledger: dict, fake_ai
 ):

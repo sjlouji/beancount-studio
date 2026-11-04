@@ -1,10 +1,15 @@
 "use client";
 
-import { CheckCircle2Icon, DatabaseIcon, FileSearchIcon, FileTextIcon, FolderTreeIcon, ListTreeIcon, ScrollTextIcon, XCircleIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { CheckCircle2Icon, DatabaseIcon, EyeIcon, FileSearchIcon, FileTextIcon, FolderTreeIcon, ListTreeIcon, ScrollTextIcon, XCircleIcon } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
+import { type ChatDocument, DocumentViewer, PREVIEWABLE, useDocumentPanel } from "@/components/ask/document-panel";
 import { DiffView } from "@/components/ledger/diff-view";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FileDownload, FileIcon, FileName, FileRoot, FileSize } from "@/components/ui/file";
 import { Spinner } from "@/components/ui/spinner";
+import { useIsWide } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 function Shell({ icon, title, status, children, error }: { icon: ReactNode; title: ReactNode; status: ToolCallMessagePartProps["status"]; children?: ReactNode; error?: boolean }) {
@@ -113,6 +118,73 @@ export function SearchToolUI({ args, result, status }: ToolCallMessagePartProps<
         </ul>
       )}
     </Shell>
+  );
+}
+
+interface DocumentResult {
+  document?: ChatDocument;
+  tables?: Array<{ title: string; rowCount: number; truncated: boolean }>;
+  error?: string;
+}
+
+/** The document in a dialog, where there is no side panel (narrow screens, outside the Ask page). */
+function DocumentDialog({ document, open, onOpenChange }: { document: ChatDocument; open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="h-[85dvh] max-w-[min(64rem,calc(100%-2rem))] grid-rows-[auto_1fr] sm:max-w-[min(64rem,calc(100%-2rem))]">
+        <DialogHeader>
+          <DialogTitle>{document.filename}</DialogTitle>
+          <DialogDescription className="sr-only">Preview of the document the assistant made</DialogDescription>
+        </DialogHeader>
+        {open && (
+          <div className="min-h-0 overflow-hidden rounded-lg border">
+            <DocumentViewer document={document} />
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const FORMAT_NAMES = { html: "HTML page", pdf: "PDF", xlsx: "Excel workbook", docx: "Word document" } as const;
+
+export function DocumentToolUI({ args, result, status }: ToolCallMessagePartProps<{ format: string; title: string }, DocumentResult>) {
+  const [previewing, setPreviewing] = useState(false);
+  const panel = useDocumentPanel();
+  const wide = useIsWide();
+  const document = result?.document;
+  const running = status.type === "running" || status.type === "requires-action";
+  if (!document) {
+    return (
+      <Shell icon={<FileTextIcon className="size-3.5" />} title={running ? `Making ${args.title ?? "the document"}…` : `Couldn't make ${args.title ?? "the document"}`} status={status} error={Boolean(result?.error)}>
+        {result?.error && <p className="text-negative">{result.error}</p>}
+      </Shell>
+    );
+  }
+  const previewable = PREVIEWABLE.has(document.format);
+  // Beside the conversation on the Ask page (as Claude shows artifacts); in a dialog elsewhere.
+  const preview = () => (panel && wide ? panel.open(document) : setPreviewing(true));
+  const rows = result?.tables?.reduce((sum, t) => sum + t.rowCount, 0) ?? 0;
+  return (
+    <div className="my-1.5">
+      <FileRoot>
+        <FileIcon mimeType={document.mimeType} />
+        <div className="min-w-0 flex-1">
+          <FileName>{document.filename}</FileName>
+          <p className="text-xs text-muted-foreground tabular">
+            {FORMAT_NAMES[document.format]} · <FileSize bytes={document.size} />
+            {result?.tables?.length ? ` · ${rows.toLocaleString()} rows from the ledger` : ""}
+          </p>
+        </div>
+        {previewable && (
+          <Button variant="secondary" size="sm" onClick={preview}>
+            <EyeIcon data-icon="inline-start" /> Preview
+          </Button>
+        )}
+        <FileDownload href={document.url} filename={document.filename} />
+      </FileRoot>
+      {previewable && <DocumentDialog document={document} open={previewing} onOpenChange={setPreviewing} />}
+    </div>
   );
 }
 

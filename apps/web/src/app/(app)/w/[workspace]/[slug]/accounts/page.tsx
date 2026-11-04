@@ -1,6 +1,6 @@
 "use client";
 
-import { ListTreeIcon, PlusIcon, SearchIcon, TableIcon } from "lucide-react";
+import { ListTreeIcon, PlusIcon, TableIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { CardSkeleton, EmptyState, ErrorState } from "@/components/app/states";
@@ -9,8 +9,8 @@ import { EntryContextSheet } from "@/components/ledger/entry-context-sheet";
 import { useLedgerContext } from "@/components/ledger/ledger-context";
 import { NewEntryDialog } from "@/components/ledger/new-entry-dialog";
 import { Button } from "@/components/ui/button";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
+import { SearchInput } from "@/components/ui/search-input";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAccounts } from "@/lib/api/hooks";
@@ -45,19 +45,22 @@ export default function AccountsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Accounts"
+       
         title="Every account, open and closed"
         description="Balances, currencies and the last entry for each account in scope. A green dot means the latest entry is a passing balance assertion."
         actions={openAccountButton}
       />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3 animate-rise [animation-delay:80ms]">
-        <InputGroup className="w-full max-w-sm">
-          <InputGroupAddon>
-            <SearchIcon />
-          </InputGroupAddon>
-          <InputGroupInput placeholder="Search accounts, e.g. expenses food" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search accounts" />
-        </InputGroup>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3 animate-rise [animation-delay:40ms]">
+        <SearchInput
+          size="lg"
+          className="max-w-sm"
+          label="Search accounts"
+          placeholder="Search accounts, e.g. expenses food"
+          value={search}
+          onValueChange={setSearch}
+          resultLabel={pluralize(visible.length, "account")}
+        />
         <div className="flex items-center gap-2">
           <Switch id="show-closed" checked={showClosed} onCheckedChange={setShowClosed} />
           <Label htmlFor="show-closed" className="text-sm font-normal">
@@ -87,7 +90,7 @@ export default function AccountsPage() {
       ) : visible.length === 0 ? (
         <EmptyState title="No accounts match" description={`Nothing matches the current search${showClosed ? "" : " among open accounts. Try enabling “Show closed”"}.`} />
       ) : (
-        <div className="space-y-2 animate-rise [animation-delay:140ms]">
+        <div className="space-y-2 animate-rise [animation-delay:70ms]">
           <AccountsTable
             accounts={visible}
             mode={mode}

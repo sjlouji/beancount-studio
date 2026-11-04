@@ -124,13 +124,13 @@ export default function ReceiptPage() {
   if (!canWrite) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Receipt" title="Capture a receipt" />
+        <PageHeader title="Capture a receipt" />
         <EmptyState icon={<LockIcon />} title="This ledger is read-only for you" description="Adding receipts writes to the ledger, which needs write access." />
       </div>
     );
   }
 
-  const header = <PageHeader eyebrow="Receipt" title="Capture a receipt" description="Drop a photo or PDF, let the model read it, fix anything it got wrong, and add the transaction with the file attached." />;
+  const header = <PageHeader title="Capture a receipt" description="Drop a photo or PDF, let the model read it, fix anything it got wrong, and add the transaction with the file attached." />;
 
   if (done) {
     return (
@@ -194,7 +194,7 @@ export default function ReceiptPage() {
       )}
 
       {!showWorkspace && (
-        <div className="animate-rise [animation-delay:60ms]">
+        <div className="animate-rise [animation-delay:30ms]">
           <Dropzone
             accept={ACCEPT}
             onFile={(file) => uploadFile.mutate(file)}
@@ -211,7 +211,7 @@ export default function ReceiptPage() {
 
       {showWorkspace && (
         <div className="grid items-start gap-5 lg:grid-cols-2">
-          <div className="space-y-3 animate-rise [animation-delay:60ms]">
+          <div className="space-y-3 animate-rise [animation-delay:30ms]">
             {upload ? (
               <div className="overflow-hidden rounded-xl border bg-card">
                 <div className="flex items-center justify-between gap-2 border-b px-4 py-2">
@@ -235,7 +235,7 @@ export default function ReceiptPage() {
             )}
           </div>
 
-          <div className="animate-rise [animation-delay:120ms]">
+          <div className="animate-rise [animation-delay:60ms]">
             {reading ? (
               <ReadingReceipt />
             ) : (

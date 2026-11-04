@@ -36,7 +36,7 @@ export function DangerZone({ ledger }: { ledger: Ledger }) {
   });
 
   return (
-    <Card className="animate-rise border-negative/40 ring-negative/20 [animation-delay:200ms]">
+    <Card className="animate-rise border-negative/40 ring-negative/20 [animation-delay:80ms]">
       <CardHeader>
         <CardTitle className="text-sm font-medium text-negative">Danger zone</CardTitle>
         <CardDescription>Deleting a ledger permanently removes its files, history, stars and chat threads. This cannot be undone. Download an archive first if you might need it.</CardDescription>

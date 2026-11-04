@@ -19,7 +19,7 @@ export default function TrialBalancePage() {
   if (query.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Reports" title="Trial balance" />
+        <PageHeader title="Trial balance" />
         <CardSkeleton rows={10} />
       </div>
     );
@@ -47,7 +47,7 @@ export default function TrialBalancePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Reports"
+       
         title="Trial balance"
         description={`Every account and its balance, grouped by root · ${rangeLabel(dateRange)}`}
         actions={<ExportMenu fileName={`trial-balance-${slug}`} build={buildReport} printable />}
@@ -63,7 +63,7 @@ export default function TrialBalancePage() {
           }
         />
       ) : (
-        <HierarchyTable className="animate-rise [animation-delay:80ms]" title="All accounts" root={tree} hideRoot initialDepth={2} summaryRows={summaryRows} />
+        <HierarchyTable className="animate-rise [animation-delay:40ms]" title="All accounts" root={tree} hideRoot initialDepth={2} summaryRows={summaryRows} />
       )}
     </div>
   );

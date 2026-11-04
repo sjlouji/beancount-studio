@@ -26,6 +26,28 @@ export interface SystemInfo {
   hasUsers: boolean;
 }
 
+/** A model an Ollama server has pulled; `canChat` is whether it calls tools (null: Ollama doesn't say). */
+export interface OllamaModel {
+  name: string;
+  size: number;
+  family: string | null;
+  parameterSize: string | null;
+  modifiedAt: string | null;
+  capabilities: string[] | null;
+  canChat: boolean | null;
+}
+
+/** The assistant's model as an admin sees it (`GET /system/ai`). */
+export interface AiConnectionStatus {
+  provider: "anthropic" | "openai" | null;
+  model: string | null;
+  /** The Ollama connection made in the app, which overrides the server's environment. */
+  connection: { baseUrl: string; model: string } | null;
+  /** The Ollama server found on this machine (or the connected one), with its models. */
+  detected: { baseUrl: string; models: OllamaModel[] } | null;
+  environmentProvider: "anthropic" | "openai" | null;
+}
+
 export interface CommitAuthor {
   name: string;
   email: string;
@@ -585,9 +607,26 @@ export interface Upload {
 export interface ChatThread {
   id: string;
   title: string;
+  /** Messages stored so far; 0 for a conversation that was opened but never used. */
+  messageCount: number;
+  /** Starred conversations list above the recent ones. */
+  pinned: boolean;
+  pinnedAt: string | null;
   createdAt: string;
   updatedAt: string;
   messages?: ThreadMessageLike[];
+}
+
+/** A document the assistant made in one of the person's conversations in a ledger. */
+export interface ChatFile {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+  url: string;
+  threadId: string;
+  threadTitle: string;
 }
 
 export interface ThreadMessageLike {

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, SearchIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
@@ -9,12 +9,13 @@ import { EntryContextSheet } from "@/components/ledger/entry-context-sheet";
 import { EntryBadgeList, EntryCard } from "@/components/ledger/entry-row";
 import { useLedgerContext } from "@/components/ledger/ledger-context";
 import { Button } from "@/components/ui/button";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { SearchInput } from "@/components/ui/search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Toggle } from "@/components/ui/toggle";
 import { ledgerPath, useJournal } from "@/lib/api/hooks";
 import { buildQuery } from "@/lib/api/client";
+import { pluralize } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const ALL_TYPES = ["Transaction", "Balance", "Open", "Close", "Note", "Document", "Pad", "Price", "Event", "Query", "Custom", "Commodity"];
@@ -61,7 +62,7 @@ export default function JournalPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Journal"
+       
         title="Every entry, in order"
         description="Transactions, balances, notes and the other directives in scope. Click an entry to inspect balances and edit its source."
         actions={
@@ -74,12 +75,16 @@ export default function JournalPage() {
       />
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <InputGroup className="w-full max-w-sm">
-            <InputGroupAddon>
-              <SearchIcon />
-            </InputGroupAddon>
-            <InputGroupInput placeholder="Search payee, narration, account, tag…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search entries" />
-          </InputGroup>
+          <SearchInput
+            size="lg"
+            className="max-w-sm"
+            label="Search entries"
+            placeholder="Search payee, narration, account, tag…"
+            value={query}
+            onValueChange={setQuery}
+            loading={query !== debounced || journal.isFetching}
+            resultLabel={journal.data ? pluralize(journal.data.total, "entry", "entries") : undefined}
+          />
           <div className="flex items-center gap-1">
             <Toggle size="sm" pressed={flags.has("*")} onPressedChange={(on) => setFlags((f) => { const n = new Set(f); if (on) n.add("*"); else n.delete("*"); return n; })} aria-label="Only cleared" className="font-mono">
               * cleared

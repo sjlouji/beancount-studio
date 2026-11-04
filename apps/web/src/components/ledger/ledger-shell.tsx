@@ -1,16 +1,16 @@
 "use client";
 
-import { BookOpenIcon, DownloadIcon, HouseIcon, LayoutDashboardIcon, MenuIcon, MoreHorizontalIcon, PlusIcon, SearchIcon, SettingsIcon, SparklesIcon } from "lucide-react";
+import { BookOpenIcon, DownloadIcon, HouseIcon, LayoutDashboardIcon, MenuIcon, MoreHorizontalIcon, PlusIcon, SettingsIcon, SparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { AppFrame } from "@/components/app/app-frame";
 import type { RailSection } from "@/components/app/rail";
 import { CommandPalette, useCommandPalette } from "@/components/app/command-palette";
+import { ChatSidebar } from "@/components/ask/chat-sidebar";
 import { ContentHeader, type HeaderTab } from "@/components/app/content-header";
 import { useFrameState } from "@/components/app/frame-state";
-import { LedgerTile } from "@/components/app/sidebar-parts";
-import { REMOTE_STATE_LABELS, RemoteStateBadge } from "@/components/data/settings-remote";
+import { REMOTE_STATE_LABELS } from "@/components/data/settings-remote";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,7 +18,7 @@ import { ledgerPath } from "@/lib/api/hooks";
 import type { Ledger, LedgerRemote } from "@/lib/api/types";
 import { formatRelative } from "@/lib/format";
 import { workspaceHref } from "@/lib/routes";
-import { AskPanel } from "./ask-panel";
+import { cn } from "@/lib/utils";
 import { FilterBar } from "./filter-bar";
 import { LedgerProvider, useLedgerContext } from "./ledger-context";
 import { LEDGER_SECTIONS, navItemIsActive, sectionForPath, visibleItems } from "./ledger-nav";
@@ -28,25 +28,36 @@ import { NewEntryDialog } from "./new-entry-dialog";
 const NO_FILTER_PATHS = ["/files", "/commits", "/settings", "/ask", "/import", "/receipt", "/entry", "/query"];
 const NO_INTERVAL_PATHS = ["/journal", "/accounts", "/commodities", "/documents", "/events", "/errors", "/budget", "/holdings", "/statistics"];
 
-/** Push state of the ledger's remote; opens the Remote card in settings. */
+// The sync dot's colour per push state: green in sync, orange needs attention, red failed.
+const REMOTE_DOT: Record<LedgerRemote["state"], string> = {
+  in_sync: "bg-positive",
+  pushing: "bg-muted-foreground",
+  behind: "bg-warning",
+  diverged: "bg-warning",
+  error: "bg-negative",
+};
+
+/** Push state of the ledger's remote as a quiet dot beside the title; opens the Remote card in settings. */
 function RemoteStatus({ remote, base }: { remote: LedgerRemote; base: string }) {
+  const label = REMOTE_STATE_LABELS[remote.state];
   const detail = remote.lastError || (remote.lastSyncedAt ? `Last synced ${formatRelative(remote.lastSyncedAt)}` : "Not synced yet");
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Link href={`${base}/settings`} className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/40" aria-label={`Remote ${REMOTE_STATE_LABELS[remote.state].toLowerCase()}. ${detail}`}>
-          <RemoteStateBadge state={remote.state} />
+        <Link href={`${base}/settings`} className="flex size-5 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/40" aria-label={`Remote ${label.toLowerCase()}. ${detail}`}>
+          <span aria-hidden className={cn("size-2 rounded-full", REMOTE_DOT[remote.state])} />
         </Link>
       </TooltipTrigger>
-      <TooltipContent>{detail}</TooltipContent>
+      <TooltipContent>
+        {label} · {detail}
+      </TooltipContent>
     </Tooltip>
   );
 }
 
-/** The channel-style header: ledger title, sync state, actions, the section's tabs and the filters. */
+/** The local nav: ledger title with its sync dot, the section's pages, New entry and More. */
 function Header() {
   const { base, ledger, canWrite, queryString } = useLedgerContext();
-  const palette = useCommandPalette();
   const [adding, setAdding] = useState(false);
   const pathname = usePathname();
   const rel = pathname.slice(base.length) || "/";
@@ -58,26 +69,17 @@ function Header() {
   return (
     <>
       <ContentHeader
-        leading={<LedgerTile title={ledger.title} className="size-7 rounded-[7px] text-[13px]" />}
         title={ledger.title}
-        subtitle={ledger.description || `${ledger.workspace}/${ledger.slug}`}
+        status={ledger.remote && <RemoteStatus remote={ledger.remote} base={base} />}
         actions={
           <>
-            {ledger.remote && <RemoteStatus remote={ledger.remote} base={base} />}
             {canWrite && (
-              <Button size="sm" variant="secondary" className="max-sm:size-7 max-sm:rounded-md max-sm:px-0" aria-label="New entry" onClick={() => setAdding(true)}>
+              // The one call to action in the nav, a small capsule as on apple.com.
+              <Button size="sm" className="rounded-full max-sm:size-7 max-sm:px-0" aria-label="New entry" onClick={() => setAdding(true)}>
                 <PlusIcon />
                 <span className="max-sm:sr-only">New entry</span>
               </Button>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" aria-label="Search this ledger" onClick={palette.open}>
-                  <SearchIcon />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Search (⌘K)</TooltipContent>
-            </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon-sm" aria-label="More">
@@ -108,11 +110,13 @@ function Header() {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  const { ledger, base, queryString, ask, openAsk } = useLedgerContext();
+  const { ledger, base, queryString } = useLedgerContext();
   const palette = useCommandPalette();
   const { setMobileSidebarOpen } = useFrameState();
   const pathname = usePathname();
   const current = sectionForPath(base, pathname);
+  // Ask is a full page: the sidebar lists the conversations, and the chat takes the whole column.
+  const asking = pathname === `${base}/ask` || pathname.startsWith(`${base}/ask/`);
   // Detail pages (an account, an entry, the full assistant) belong to no section; the sidebar then lists the ledger's own pages.
   const sidebarSection = current ?? LEDGER_SECTIONS[0]!;
   const railSections: RailSection[] = LEDGER_SECTIONS.flatMap((section) => {
@@ -121,17 +125,17 @@ function Shell({ children }: { children: ReactNode }) {
   });
   return (
     <AppFrame
-      sidebar={<LedgerSidebar section={sidebarSection} onSearch={palette.open} />}
+      sidebar={asking ? <ChatSidebar /> : <LedgerSidebar section={sidebarSection} onSearch={palette.open} />}
       header={<Header />}
-      aside={<AskPanel />}
+      contentClassName={asking ? "max-w-none p-0 md:p-0" : undefined}
       searchLabel={`Search ${ledger.title}`}
       onSearch={palette.open}
-      railExtra={{ sections: railSections, onAsk: () => openAsk(), askActive: ask.open }}
+      railExtra={{ sections: railSections, askHref: `${base}/ask`, askActive: asking }}
       mobileTabs={[
         { label: "Home", icon: HouseIcon, href: workspaceHref(ledger.workspace) },
         { label: "Overview", icon: LayoutDashboardIcon, href: base, active: pathname === base },
         { label: "Journal", icon: BookOpenIcon, href: `${base}/journal`, active: pathname.startsWith(`${base}/journal`) },
-        { label: "Ask", icon: SparklesIcon, onClick: () => openAsk(), active: ask.open },
+        { label: "Ask", icon: SparklesIcon, href: `${base}/ask`, active: asking },
         { label: "Menu", icon: MenuIcon, onClick: () => setMobileSidebarOpen(true) },
       ]}
     >

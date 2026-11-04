@@ -50,7 +50,7 @@ export function UploadStep({
 
   return (
     <div className="space-y-5">
-      <div className="animate-rise [animation-delay:120ms]">
+      <div className="animate-rise [animation-delay:60ms]">
         <Dropzone
           accept={STATEMENT_ACCEPT}
           onFile={onFile}

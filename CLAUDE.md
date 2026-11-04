@@ -43,5 +43,18 @@ pnpm exec tsc --noEmit && pnpm lint && pnpm build
   surfaces, link blue). Tokens only (no raw colours), tabular numbers, h1 only through
   `PageHeader`, every state (pending/error/empty) handled. `docs/frontend-conventions.md` holds
   the app-specific patterns; where it conflicts with `DESIGN.md`, `DESIGN.md` wins.
+- UI and motion work loads the matching skill in `.claude/skills` before writing code:
+  - Every UI change: `apple-design` (with `DESIGN.md`, the design bar). Any animation:
+    `animation-performance` (transform/opacity only, no `transition-all`, no layout animation).
+  - New motion → `animate`; a diff that touches motion → `review-animations`; app-wide motion
+    audit → `improve-animations`; adding or cutting motion → `find-animation-opportunities` /
+    `remove-animations`.
+  - Component polish → `emil-design-eng`; anything shown below `md` → `mobile-native`; toasts →
+    `ask-sonner`; worst-case data → `break-ui`; naming an effect → `animation-vocabulary`.
+  - Designs, mockups and decks for this project use the "Beancount Studio" design system
+    (https://claude.ai/artifact/27pGp5jM6AMSW2SBWkJe65), not the organization's default. When
+    `globals.css` tokens or `DESIGN.md` change, update its `project/tokens.json` and README to match.
+  - Only when asked: `prototype`, `pick-ui-library`. `animate-expo` and `write-swift` don't apply
+    (no Expo or Swift here).
 - Tests: API changes need a pytest in `apps/api/tests`; run the full suite before finishing.
 - Secrets live in `.env` files (gitignored). Commit only `.env.example`.

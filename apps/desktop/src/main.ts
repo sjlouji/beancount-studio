@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, screen, session, shell } from "electron";
 import log from "electron-log/main";
 
 import type { DesktopWorkspace, DesktopWorkspaceUpdate } from "@beancount-studio/desktop-bridge";
@@ -19,6 +19,7 @@ import {
   signInUrl,
   type SignInChallenge,
 } from "./sign-in";
+import { restorableBounds } from "./window-bounds";
 
 log.initialize();
 
@@ -37,6 +38,11 @@ const GRANTED_PERMISSIONS = new Set(["notifications", "clipboard-sanitized-write
 const MAX_WORKSPACES = 50;
 const WORKSPACE_SLUG = /^[a-z0-9-]{1,40}$/;
 const WORKSPACE_ROLES = new Set(["owner", "admin", "member", "viewer"]);
+const WINDOW_SIZE = { width: 1280, height: 820 };
+const WINDOW_MINIMUM = { width: 960, height: 640 };
+// The web client's canvas (`--background` in apps/web globals.css), so the window shows the same
+// colour as the page before it paints instead of flashing another one.
+const CANVAS_COLOR = { light: "#ffffff", dark: "#000000" };
 
 interface PendingSignIn {
   origin: string;
@@ -287,6 +293,13 @@ function applyMenus(): void {
     { role: "editMenu" },
     { label: "Workspace", submenu: workspaceMenuEntries(workspaces, connected).map(menuItem) },
     { role: "viewMenu" },
+    {
+      label: "History",
+      submenu: [
+        { label: "Back", accelerator: "CmdOrCtrl+[", click: () => goInHistory(-1) },
+        { label: "Forward", accelerator: "CmdOrCtrl+]", click: () => goInHistory(1) },
+      ],
+    },
     { role: "windowMenu" },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -320,15 +333,40 @@ function parseWorkspaceUpdate(input: unknown): DesktopWorkspaceUpdate | null {
 
 // ---------------------------------------------------------------- window
 
+function canvasColor(): string {
+  return nativeTheme.shouldUseDarkColors ? CANVAS_COLOR.dark : CANVAS_COLOR.light;
+}
+
+/**
+ * Back or forward one page, like Safari's ⌘[ and ⌘] or a swipe. Only between pages of the
+ * connected server: the connect and waiting screens are not places to return to.
+ */
+function goInHistory(step: -1 | 1): void {
+  const history = mainWindow?.webContents.navigationHistory;
+  if (!history || serverOrigin === null) return;
+  const target = history.getEntryAtIndex(history.getActiveIndex() + step);
+  if (!target || !isOnServer(target.url, serverOrigin)) return;
+  if (step < 0) history.goBack();
+  else history.goForward();
+}
+
 function createWindow(): BrowserWindow {
+  const { settings } = readSettings();
+  const workAreas = screen.getAllDisplays().map((display) => display.workArea);
+  const bounds = restorableBounds(settings.windowBounds, workAreas, WINDOW_MINIMUM);
   const window = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 960,
-    minHeight: 640,
+    ...(bounds ?? WINDOW_SIZE),
+    minWidth: WINDOW_MINIMUM.width,
+    minHeight: WINDOW_MINIMUM.height,
     title: "Beancount Studio",
     show: false,
-    backgroundColor: "#f4ede4",
+    backgroundColor: canvasColor(),
+    // macOS: no system title bar. The traffic lights sit inside the web client's 44px top bar,
+    // which drags the window; the window-controls overlay tells the page where they end
+    // (`env(titlebar-area-x)`, used by the `titlebar` utility in apps/web globals.css).
+    ...(process.platform === "darwin"
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 15 }, titleBarOverlay: true }
+      : {}),
     webPreferences: {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -361,6 +399,19 @@ function createWindow(): BrowserWindow {
     if (!isMainFrame || code === ERR_ABORTED) return;
     log.error("load failed", { code, description, url });
     void showConnect({ url: serverOrigin ?? url, error: `Could not load ${url}: ${description} (${code}).` });
+  });
+  // A three-finger swipe (or two-or-three, per the trackpad setting) goes back and forward.
+  window.on("swipe", (_event, direction) => {
+    if (direction === "left") goInHistory(-1);
+    else if (direction === "right") goInHistory(1);
+  });
+  window.on("close", () => {
+    try {
+      writeSettings({ windowBounds: window.getNormalBounds() });
+    } catch (error) {
+      // Losing the position only means the next window opens at the default size.
+      log.error("could not save the window position", error);
+    }
   });
   window.on("closed", () => {
     mainWindow = null;
@@ -494,6 +545,7 @@ app
   .then(async () => {
     configureSession();
     applyMenus();
+    nativeTheme.on("updated", () => mainWindow?.setBackgroundColor(canvasColor()));
     mainWindow = createWindow();
     await start();
     app.on("activate", () => {

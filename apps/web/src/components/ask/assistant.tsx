@@ -7,6 +7,7 @@ import {
   SimpleImageAttachmentAdapter,
   SimpleTextAttachmentAdapter,
   Tools,
+  useAui,
   type AttachmentAdapter,
   type CompleteAttachment,
   type PendingAttachment,
@@ -16,15 +17,16 @@ import {
 import { useDataStreamRuntime } from "@assistant-ui/react-data-stream";
 import type { JSONSchema7 } from "json-schema";
 import { useQueryClient } from "@tanstack/react-query";
-import { SparklesIcon } from "lucide-react";
+import { FileTextIcon, PlusIcon, ScaleIcon, SparklesIcon, TrendingUpIcon } from "lucide-react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 import { Thread } from "@/components/assistant-ui/elements/thread.aui";
 import { useLedgerContext } from "@/components/ledger/ledger-context";
-import { keys, ledgerPath, useSystemInfo } from "@/lib/api/hooks";
+import { Button } from "@/components/ui/button";
+import { keys, ledgerPath, useMe, useSystemInfo } from "@/lib/api/hooks";
 import type { ThreadMessageLike as StoredMessage } from "@/lib/api/types";
 import { ApprovalCard } from "./approval-card";
-import { BqlToolUI, CheckEditToolUI, EditFilesToolUI, ListFilesToolUI, ReadFileToolUI, ReportToolUI, SearchToolUI, SummaryToolUI } from "./tool-uis";
+import { BqlToolUI, CheckEditToolUI, DocumentToolUI, EditFilesToolUI, ListFilesToolUI, ReadFileToolUI, ReportToolUI, SearchToolUI, SummaryToolUI } from "./tool-uis";
 
 const APPROVAL_PARAMETERS = {
   type: "object",
@@ -67,6 +69,7 @@ const toolkit: Toolkit = {
   get_report: { type: "backend", render: ReportToolUI },
   check_ledger_edit: { type: "backend", render: CheckEditToolUI },
   edit_ledger_files: { type: "backend", render: EditFilesToolUI },
+  create_document: { type: "backend", render: DocumentToolUI },
 };
 
 function readAsDataUrl(file: File): Promise<string> {
@@ -100,22 +103,62 @@ function toInitialMessages(messages: StoredMessage[] | undefined): ThreadMessage
   return messages.map((m) => ({ role: m.role, content: m.content as unknown as ThreadMessageLike["content"] })) as ThreadMessageLike[];
 }
 
+function greeting(hour: number): string {
+  if (hour < 5) return "Working late";
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+/** A new conversation, as in Claude: a greeting by name over a centred composer. */
 function Welcome() {
-  const { ledger, canWrite } = useLedgerContext();
-  const { data: info } = useSystemInfo();
+  const { ledger } = useLedgerContext();
+  const { data: me } = useMe();
+  const name = (me?.displayName || me?.username || "").split(" ")[0];
   return (
-    <div className="flex flex-col items-center gap-3 py-10 text-center animate-rise">
-      <div className="flex size-12 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
-        <SparklesIcon className="size-6" />
+    <div className="mb-8 flex flex-col items-center gap-2 text-center animate-rise">
+      <h2 className="flex items-center gap-2.5 type-title-1 text-balance">
+        <SparklesIcon aria-hidden className="size-7 shrink-0" />
+        {greeting(new Date().getHours())}
+        {name ? `, ${name}` : ""}
+      </h2>
+      <p className="type-callout text-muted-foreground">Ask about {ledger.title}: spending, reports, files and entries.</p>
+    </div>
+  );
+}
+
+/** Starting points under the composer of a new conversation; each sends its prompt. */
+function Suggestions() {
+  const { canWrite } = useLedgerContext();
+  const { data: info } = useSystemInfo();
+  const aui = useAui();
+  const prompts = [
+    { icon: TrendingUpIcon, label: "Top spending this month", prompt: "What were my top expenses this month?" },
+    { icon: ScaleIcon, label: "Net worth today", prompt: "What is my net worth today, by account type?" },
+    { icon: FileTextIcon, label: "PDF report", prompt: "Make me a PDF report of my income and expenses this year." },
+    ...(canWrite ? [{ icon: PlusIcon, label: "Add a transaction", prompt: "Help me add a transaction." }] : []),
+  ];
+  return (
+    <div className="flex flex-col items-center gap-3 animate-rise [animation-delay:40ms]">
+      <div className="flex flex-wrap justify-center gap-2">
+        {prompts.map(({ icon: Icon, label, prompt }) => (
+          <Button
+            key={label}
+            variant="chip"
+            size="sm"
+            onClick={() => {
+              aui.composer().setText(prompt);
+              aui.composer().send();
+            }}
+          >
+            <Icon data-icon="inline-start" /> {label}
+          </Button>
+        ))}
       </div>
-      <h2 className="type-title-2">Ask about {ledger.title}</h2>
-      <p className="max-w-md text-sm text-muted-foreground">
-        It can run queries, read your files and reports, and {canWrite ? "propose edits that you approve before anything is written" : "draft entries you can add yourself"}. Attach a receipt or statement to turn it into entries.
-      </p>
       {info?.aiModel && (
-        <p className="text-xs text-muted-foreground">
+        <p className="type-footnote text-muted-foreground">
           <span className="font-mono">{info.aiModel}</span>
-          {info.aiProvider === "openai" ? " · self-hosted via an OpenAI-compatible server" : " · Anthropic"}
+          {info.aiProvider === "openai" ? " · runs on your server" : " · Anthropic"}
         </p>
       )}
     </div>
@@ -148,7 +191,7 @@ export function LedgerAssistant({ threadId, initialMessages }: { threadId: strin
   return (
     <AssistantRuntimeProvider runtime={runtime} config={config}>
       <div className="h-full min-h-0">
-        <Thread components={{ Welcome }} />
+        <Thread components={{ Welcome, Suggestions }} />
       </div>
     </AssistantRuntimeProvider>
   );

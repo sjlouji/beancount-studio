@@ -1,16 +1,21 @@
 "use client";
 
-import { CalendarRangeIcon, FilterIcon, ListTreeIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Toolbar, ToolbarButton } from "@/components/ui/toolbar";
 import { cn } from "@/lib/utils";
 import { AccountCombobox } from "./account-combobox";
 import { useLedgerContext } from "./ledger-context";
+
+// Quiet text menus, as on apple.com: no border, no icon. Grey while a filter is at its default, the
+// label colour once it is set, so the row reads as a sentence of the current scope.
+const QUIET = "h-8 gap-1 px-2 font-medium text-muted-foreground hover:text-foreground aria-expanded:text-foreground data-[set=true]:text-foreground";
+const QUIET_SELECT = "h-8 w-auto gap-1 border-0 bg-transparent px-2 font-medium text-muted-foreground shadow-none hover:text-foreground data-[state=open]:text-foreground dark:bg-transparent";
 
 const INTERVALS = [
   { value: "day", label: "Daily" },
@@ -45,10 +50,10 @@ function TimeInput() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant={params.time ? "secondary" : "chip"} size="sm" className="gap-1.5 font-medium">
-          <CalendarRangeIcon className="size-3.5 opacity-70" />
+        <ToolbarButton variant="ghost" size="sm" data-set={Boolean(params.time)} className={QUIET}>
           {params.time || "All time"}
-        </Button>
+          <ChevronDownIcon className="size-3.5 opacity-60" />
+        </ToolbarButton>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-3">
         <form
@@ -102,10 +107,10 @@ function AdvancedFilter() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant={params.filter ? "secondary" : "chip"} size="sm" className="gap-1.5 font-medium">
-          <FilterIcon className="size-3.5 opacity-70" />
+        <ToolbarButton variant="ghost" size="sm" data-set={Boolean(params.filter)} className={QUIET}>
           {params.filter ? <span className="max-w-40 truncate font-mono text-xs">{params.filter}</span> : "Filter"}
-        </Button>
+          <ChevronDownIcon className="size-3.5 opacity-60" />
+        </ToolbarButton>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-96 p-3">
         <form
@@ -133,33 +138,34 @@ export function FilterBar({ className, showInterval = true, showConversion = tru
   const currencies = attributes?.currencies ?? meta?.operatingCurrencies ?? [];
   const operating = meta?.operatingCurrencies ?? [];
   return (
-    <div className={cn("flex items-center gap-2 overflow-x-auto py-0.5 scrollbar-thin *:shrink-0 md:flex-wrap md:overflow-visible", className)}>
+    <Toolbar aria-label="Report filters" className={cn("gap-0.5", className)}>
       <TimeInput key={`time:${params.time ?? ""}`} />
-      <AccountCombobox
-        value={params.account ?? ""}
-        onChange={(account) => setParams({ account: account || undefined })}
-        placeholder="All accounts"
-        icon={<ListTreeIcon className="size-3.5 opacity-70" />}
-        size="sm"
-        allowPrefix
-      />
+      <ToolbarButton asChild>
+        <AccountCombobox
+          value={params.account ?? ""}
+          onChange={(account) => setParams({ account: account || undefined })}
+          placeholder="All accounts"
+          size="sm"
+          variant="ghost"
+          data-set={Boolean(params.account)}
+          className={QUIET}
+          allowPrefix
+        />
+      </ToolbarButton>
       <AdvancedFilter key={`filter:${params.filter ?? ""}`} />
       {hasFilters && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" onClick={clearFilters} aria-label="Clear filters">
-              <XIcon />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Clear filters</TooltipContent>
-        </Tooltip>
+        <ToolbarButton variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 font-medium text-link hover:text-link-hover">
+          Clear
+        </ToolbarButton>
       )}
       <div className="ml-auto flex items-center gap-2">
         {showInterval && (
           <Select value={params.interval ?? "month"} onValueChange={(v) => setParams({ interval: v === "month" ? undefined : v })}>
-            <SelectTrigger size="sm" className="h-8 w-28 rounded-full font-medium" aria-label="Interval">
-              <SelectValue />
-            </SelectTrigger>
+            <ToolbarButton asChild>
+              <SelectTrigger size="sm" className={QUIET_SELECT} aria-label="Interval">
+                <SelectValue />
+              </SelectTrigger>
+            </ToolbarButton>
             <SelectContent>
               {INTERVALS.map((i) => (
                 <SelectItem key={i.value} value={i.value}>
@@ -171,9 +177,11 @@ export function FilterBar({ className, showInterval = true, showConversion = tru
         )}
         {showConversion && (
           <Select value={conversion} onValueChange={(v) => setParams({ conversion: v === operating[0] ? undefined : v })}>
-            <SelectTrigger size="sm" className="h-8 w-36 rounded-full font-medium" aria-label="Conversion">
-              <SelectValue />
-            </SelectTrigger>
+            <ToolbarButton asChild>
+              <SelectTrigger size="sm" className={QUIET_SELECT} aria-label="Conversion">
+                <SelectValue />
+              </SelectTrigger>
+            </ToolbarButton>
             <SelectContent>
               <SelectGroup>
                 <SelectLabel>Convert to</SelectLabel>
@@ -193,6 +201,6 @@ export function FilterBar({ className, showInterval = true, showConversion = tru
           </Select>
         )}
       </div>
-    </div>
+    </Toolbar>
   );
 }

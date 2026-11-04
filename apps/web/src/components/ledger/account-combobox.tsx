@@ -2,6 +2,7 @@
 
 import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
+import type * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,7 +10,11 @@ import { useLedgerAttributes } from "@/lib/api/hooks";
 import { cn } from "@/lib/utils";
 import { useLedgerContext } from "./ledger-context";
 
-/** Account picker with fuzzy search over the ledger's accounts (and parent prefixes). */
+/**
+ * Account picker with fuzzy search over the ledger's accounts (and parent prefixes). Extra props
+ * (a ref, key handlers, tabIndex) land on the trigger button, so a Toolbar can make it one of its
+ * arrow-key stops.
+ */
 export function AccountCombobox({
   value,
   onChange,
@@ -21,7 +26,9 @@ export function AccountCombobox({
   className,
   id,
   disabled,
-}: {
+  variant,
+  ...triggerProps
+}: Omit<React.ComponentProps<"button">, "value" | "onChange"> & {
   value: string;
   onChange: (account: string) => void;
   placeholder?: string;
@@ -33,6 +40,8 @@ export function AccountCombobox({
   className?: string;
   id?: string;
   disabled?: boolean;
+  /** The trigger's look; by default a field (outline, or grey once an account is picked). */
+  variant?: "outline" | "secondary" | "ghost";
 }) {
   const { workspace, slug } = useLedgerContext();
   const { data: attributes } = useLedgerAttributes(workspace, slug);
@@ -66,8 +75,9 @@ export function AccountCombobox({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          {...triggerProps}
           id={id}
-          variant={value ? "secondary" : "outline"}
+          variant={variant ?? (value ? "secondary" : "outline")}
           size={size}
           role="combobox"
           aria-expanded={open}

@@ -4,6 +4,7 @@ import { AlertCircleIcon, CopyIcon, SparklesIcon, HistoryIcon } from "lucide-rea
 import { AccountCombobox } from "@/components/ledger/account-combobox";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -105,7 +106,7 @@ export function ImportTable({
                   <Switch size="sm" checked={view.included} disabled={view.invalid} onCheckedChange={(on) => onPatch(row.id, { include: on })} aria-label={`Include row ${row.id + 1}`} />
                 </TableCell>
                 <TableCell>
-                  <Input type="date" value={row.date} onChange={(e) => onPatch(row.id, { date: e.target.value })} aria-label="Date" aria-invalid={view.invalid && !row.date ? true : undefined} className="h-8 tabular" />
+                  <DateInput size="sm" value={row.date} onValueChange={(date) => onPatch(row.id, { date })} aria-label="Date" aria-invalid={view.invalid && !row.date ? true : undefined} />
                 </TableCell>
                 <TableCell>
                   <Input value={row.payee} onChange={(e) => onPatch(row.id, { payee: e.target.value })} aria-label="Payee" className="h-8" />

@@ -7,6 +7,8 @@ import { CardSkeleton, EmptyState, ErrorState } from "@/components/app/states";
 import { useLedgerContext } from "@/components/ledger/ledger-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { List, ListItem } from "@/components/ui/list";
+import { Stack } from "@/components/ui/stack";
 import { useLedgerErrors } from "@/lib/api/hooks";
 import { pluralize } from "@/lib/format";
 
@@ -16,19 +18,19 @@ export default function ErrorsPage() {
 
   if (errors.isPending) {
     return (
-      <div className="space-y-6">
-        <PageHeader eyebrow="Errors" title="Ledger errors" />
+      <Stack gap={6}>
+        <PageHeader title="Ledger errors" />
         <CardSkeleton rows={4} />
-      </div>
+      </Stack>
     );
   }
   if (errors.isError) return <ErrorState error={errors.error} onRetry={() => void errors.refetch()} />;
   const list = errors.data;
 
   return (
-    <div className="space-y-6">
+    <Stack gap={6}>
       <PageHeader
-        eyebrow="Errors"
+       
         title={list.length === 0 ? "No ledger errors" : `${list.length} ledger ${pluralize(list.length, "error")}`}
         description="Problems found when parsing and validating the ledger, the same checks `bean-check` runs."
       />
@@ -44,9 +46,9 @@ export default function ErrorsPage() {
           }
         />
       ) : (
-        <ul className="space-y-2">
+        <List variant="plain" gap={2}>
           {list.map((error, index) => (
-            <li key={`${error.filename}:${error.lineno}:${index}`} className="animate-rise rounded-xl border border-negative/30 bg-card p-4" style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}>
+            <ListItem key={`${error.filename}:${error.lineno}:${index}`} className="animate-rise rounded-xl border border-negative/30 bg-card p-4" style={{ animationDelay: `${Math.min(index, 4) * 20}ms` }}>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="destructive">{error.type}</Badge>
                 {error.filename && (
@@ -62,10 +64,10 @@ export default function ErrorsPage() {
                 )}
               </div>
               <p className="mt-2 font-mono text-[13px] leading-relaxed break-words whitespace-pre-wrap">{error.message}</p>
-            </li>
+            </ListItem>
           ))}
-        </ul>
+        </List>
       )}
-    </div>
+    </Stack>
   );
 }

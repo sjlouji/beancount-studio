@@ -46,7 +46,7 @@ export default function CashFlowPage() {
   if (query.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Reports" title="Cash flow" />
+        <PageHeader title="Cash flow" />
         <CardSkeleton rows={8} />
         <CardSkeleton rows={6} />
       </div>
@@ -74,7 +74,7 @@ export default function CashFlowPage() {
 
   const header = (
     <PageHeader
-      eyebrow="Reports"
+     
       title="Cash flow"
       description={`Where cash came from and where it went, by ${interval} · ${rangeLabel(data.dateRange)}`}
       actions={<ExportMenu fileName={`cash-flow-${slug}`} build={buildReport} printable={false} />}
@@ -101,14 +101,14 @@ export default function CashFlowPage() {
   return (
     <div className="space-y-6">
       {header}
-      <Card className="animate-rise [animation-delay:80ms]">
+      <Card className="animate-rise [animation-delay:40ms]">
         <CardContent>
           <h2 className="mb-2 text-sm font-medium">Operating, investing and financing</h2>
           <IntervalBarChart data={chartData} unit={unit} precisions={precisions} interval={interval} mode="stacked" height={280} />
         </CardContent>
       </Card>
 
-      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:120ms]" aria-labelledby="cf-intervals">
+      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:60ms]" aria-labelledby="cf-intervals">
         <header className="border-b px-4 py-2.5">
           <h3 id="cf-intervals" className="text-sm font-medium">
             By period
@@ -160,7 +160,7 @@ export default function CashFlowPage() {
       </section>
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
-        <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:160ms] lg:col-span-2" aria-labelledby="cf-accounts">
+        <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:80ms] lg:col-span-2" aria-labelledby="cf-accounts">
           <header className="border-b px-4 py-2.5">
             <h3 id="cf-accounts" className="text-sm font-medium">
               How each account was classified
@@ -207,7 +207,7 @@ export default function CashFlowPage() {
         </section>
 
         <div className="space-y-4">
-          <Card className="animate-rise [animation-delay:200ms]">
+          <Card className="animate-rise [animation-delay:80ms]">
             <CardContent>
               <h3 className="mb-2 text-sm font-medium">Cash accounts</h3>
               {data.cashAccounts.length === 0 ? (
@@ -230,7 +230,7 @@ export default function CashFlowPage() {
               )}
             </CardContent>
           </Card>
-          <Card className="animate-rise [animation-delay:240ms]">
+          <Card className="animate-rise [animation-delay:80ms]">
             <CardContent className="space-y-2 text-sm">
               <h3 className="text-sm font-medium">Override the classification</h3>
               <p className="text-muted-foreground">

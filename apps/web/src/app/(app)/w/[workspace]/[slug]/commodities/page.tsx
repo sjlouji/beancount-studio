@@ -10,6 +10,7 @@ import { useLedgerContext } from "@/components/ledger/ledger-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useCommodities } from "@/lib/api/hooks";
 
 const PRICE_EXAMPLE = `2025-01-31 price GLD  198.93 USD
@@ -24,7 +25,7 @@ export default function CommoditiesPage() {
   if (report.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Commodities" title="Prices and declared commodities" />
+        <PageHeader title="Prices and declared commodities" />
         <div className="grid gap-4 lg:grid-cols-2">
           <CardSkeleton rows={6} />
           <CardSkeleton rows={6} />
@@ -38,7 +39,7 @@ export default function CommoditiesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Commodities"
+       
         title="Prices and declared commodities"
         description="Price history for every commodity pair in scope, and the commodities you have declared with their metadata."
       />
@@ -56,12 +57,12 @@ export default function CommoditiesPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {pairs.map((pair, i) => (
-            <PriceCard key={`${pair.base}/${pair.quote}`} pair={pair} name={names[pair.base]} precisions={precisions} delay={Math.min(i, 6) * 40} />
+            <PriceCard key={`${pair.base}/${pair.quote}`} pair={pair} name={names[pair.base]} precisions={precisions} delay={Math.min(i, 4) * 20} />
           ))}
         </div>
       )}
 
-      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:120ms]">
+      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:60ms]">
         <header className="border-b px-4 py-2.5">
           <h2 className="text-sm font-medium">Declared commodities</h2>
         </header>
@@ -80,7 +81,7 @@ export default function CommoditiesPage() {
                 <TableHead className="text-right">Precision</TableHead>
                 {canWrite && (
                   <TableHead className="w-10">
-                    <span className="sr-only">Actions</span>
+                    <VisuallyHidden>Actions</VisuallyHidden>
                   </TableHead>
                 )}
               </TableRow>

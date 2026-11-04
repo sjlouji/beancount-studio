@@ -105,7 +105,7 @@ export function VisibilityCard({ ledger }: { ledger: Ledger }) {
   const [visibility, setVisibility] = useState<Ledger["visibility"]>(ledger.visibility);
 
   return (
-    <Card className="animate-rise [animation-delay:40ms]">
+    <Card className="animate-rise [animation-delay:20ms]">
       <CardHeader>
         <CardTitle className="text-sm font-medium">Visibility</CardTitle>
         <CardDescription>Workspace admins decide who can see this ledger.</CardDescription>

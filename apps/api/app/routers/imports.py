@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, File, Form, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.deps import LedgerReadDep, LedgerWriteDep, SettingsDep, author_for
+from app.core.deps import AiSettingsDep, LedgerReadDep, LedgerWriteDep, SettingsDep, author_for
 from app.errors import ValidationError
 from app.importers.csv_import import ColumnMapping, parse_statement, render_transaction
 from app.ledgers import engine
@@ -65,7 +65,7 @@ class CategorizeRequest(BaseModel):
 
 
 @router.post("/categorize")
-async def categorize(body: CategorizeRequest, access: LedgerReadDep, settings: SettingsDep):
+async def categorize(body: CategorizeRequest, access: LedgerReadDep, settings: AiSettingsDep):
     """Rule-based suggestions from payee history, refined by the AI model for unknown payees."""
     from app.ai.categorize import suggest_categories
 

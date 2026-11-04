@@ -68,7 +68,7 @@ export function PageSkeleton({ cards = 3, className }: { cards?: number; classNa
 
 export function ErrorState({ error, onRetry, title = "Couldn't load this", className }: { error: unknown; onRetry?: () => void; title?: string; className?: string }) {
   return (
-    <Empty className={cn("border border-dashed border-negative/40 bg-negative/5", className)}>
+    <Empty role="alert" className={cn("border border-dashed border-negative/40 bg-negative/5", className)}>
       <EmptyHeader>
         <EmptyMedia variant="icon" className="bg-negative/10 text-negative">
           <AlertTriangleIcon />

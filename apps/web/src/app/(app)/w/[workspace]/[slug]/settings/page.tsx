@@ -14,7 +14,7 @@ export default function LedgerSettingsPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <PageHeader eyebrow="Settings" title="Ledger settings" description={`${workspace}/${slug}`} className="mb-2" />
+      <PageHeader title="Ledger settings" description={`${workspace}/${slug}`} className="mb-2" />
       {canAdmin && <GeneralCard key={`${ledger.slug}:${ledger.updatedAt}`} ledger={ledger} />}
       {canAdmin && <VisibilityCard key={`${ledger.visibility}:${ledger.updatedAt}`} ledger={ledger} />}
       <RemoteCard ledger={ledger} />

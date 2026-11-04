@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from typing import Any
 
 from assistant_stream import RunController
@@ -19,9 +20,16 @@ SYSTEM_PROMPT = """You are the accounting assistant inside Beancount Studio, wor
 You can query the ledger, read its files, run financial reports and - with the user's explicit approval - edit ledger files.
 Apply double-entry discipline and follow the ledger's existing conventions (account names, currencies, date style, file layout) over your own preferences.
 
+## Answer with results, never with instructions
+- When a question needs data, CALL the tool yourself (run_bql_query, get_report, ...) and answer with what it returned.
+- Never show the user a query, code or a tool call to run, and never tell them to run anything: they see only your answer.
+- Quote concrete figures with their currency, from tool results only; never estimate or invent numbers.
+- When the user asks for a report, export, spreadsheet, PDF, Word or HTML file, call create_document. Its tables come
+  from BQL queries the server runs, so put every figure in a table query, not in the body.
+
 ## Workflow
 - Start by calling get_ledger_summary when you need account names, currencies, payees or file layout.
-- For numbers, prefer run_bql_query or get_report over guessing. Quote concrete figures with their currency.
+- For "this month" or "last year", work out the dates from today's date and filter with date >= / date < in the query.
 - To change the ledger: read the relevant file region first, build the exact file operations, validate them with check_ledger_edit,
   then call request_approval with a clear one-sentence description and the operations. The user sees the diff and approves or rejects.
   Only after an approval result may you call edit_ledger_files with the identical arguments. Never claim a change was made unless edit_ledger_files reported committed=true.
@@ -138,6 +146,8 @@ class AgentRun:
             return
         tools, frontend_names = build_tools(self.access, self.frontend_tools)
         system_text = SYSTEM_PROMPT + ("" if self.access.can_write else READ_ONLY_NOTE)
+        # Relative periods ("this month") need a reference date the model can't know on its own.
+        system_text += f"\n\nToday is {dt.date.today().isoformat()}."
         if self.extra_system:
             system_text += "\n\n" + self.extra_system
         if systems:

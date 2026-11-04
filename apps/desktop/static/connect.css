@@ -1,35 +1,49 @@
-/* Tokens mirror apps/web/src/app/globals.css (DESIGN.md: aubergine primary, cream surfaces, pill buttons). */
+/* Tokens mirror apps/web/src/app/globals.css (DESIGN.md: Apple monochrome, true-black dark). */
 :root {
-  --background: #f4ede4;
+  --background: #ffffff;
   --card: #ffffff;
-  --foreground: #1d1d1d;
-  --muted-foreground: #696969;
-  --primary: #4a154b;
-  --primary-press: #611f69;
+  --foreground: #1d1d1f;
+  --muted-foreground: #6e6e73;
+  --primary: #1d1d1f;
+  --primary-press: #424245;
   --primary-foreground: #ffffff;
-  --border: #e6e6e6;
-  --ring: #611f69;
-  --destructive: #cc4117;
-  --accent: #f9f0ff;
-  --accent-foreground: #1d1d1d;
-  --link: #1264a3;
+  --border: rgb(60 60 67 / 0.14);
+  --input: rgb(60 60 67 / 0.22);
+  --ring: #007aff;
+  --destructive: #d70015;
+  --accent: #e8e8ed;
+  --accent-foreground: #1d1d1f;
+  --link: #0066cc;
+  --shadow: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.06);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #1a0f1b;
-    --card: #221322;
-    --foreground: #ffffff;
-    --muted-foreground: #d9bdde;
-    --primary: #9b4fa6;
-    --primary-press: #b066bb;
-    --border: #3a2740;
-    --ring: #d9bdde;
-    --destructive: #e8653d;
-    --accent: #3a2240;
-    --accent-foreground: #ffffff;
-    --link: #8ab4f8;
+    --background: #000000;
+    --card: #161617;
+    --foreground: #f5f5f7;
+    --muted-foreground: #a1a1a6;
+    --primary: #f5f5f7;
+    --primary-press: #d2d2d7;
+    --primary-foreground: #000000;
+    --border: rgb(255 255 255 / 0.12);
+    --input: rgb(255 255 255 / 0.16);
+    --ring: #0a84ff;
+    --destructive: #ff453a;
+    --accent: #2c2c2e;
+    --accent-foreground: #f5f5f7;
+    --link: #2997ff;
+    --shadow: 0 8px 24px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.3);
+    color-scheme: dark;
   }
+}
+
+/* The window has no system title bar: this strip under the traffic lights drags it. */
+.titlebar {
+  position: fixed;
+  inset: 0 0 auto;
+  height: 44px;
+  -webkit-app-region: drag;
 }
 
 * {
@@ -48,9 +62,10 @@ body {
   padding: 32px 16px;
   background: var(--background);
   color: var(--foreground);
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, Inter, "Segoe UI", sans-serif;
   font-size: 15px;
-  line-height: 1.55;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -60,6 +75,7 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 16px;
+  box-shadow: var(--shadow);
 }
 
 .eyebrow {
@@ -94,8 +110,8 @@ label {
 input {
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid var(--input);
+  border-radius: 8px;
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -118,12 +134,17 @@ button {
   width: 100%;
   padding: 10px 30px;
   border: 0;
-  border-radius: 90px;
+  border-radius: 10px;
   background: var(--primary);
   color: var(--primary-foreground);
   font: inherit;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
+  transition: background-color 100ms cubic-bezier(0.23, 1, 0.32, 1), transform 100ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 button:hover,

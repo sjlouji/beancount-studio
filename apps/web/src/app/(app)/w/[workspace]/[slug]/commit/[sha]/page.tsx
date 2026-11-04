@@ -42,7 +42,7 @@ export default function CommitPage({ params }: { params: Promise<{ sha: string }
   if (commit.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Commit" title={<span className="font-mono text-2xl">{sha.slice(0, 7)}</span>} />
+        <PageHeader title={<span className="font-mono text-2xl">{sha.slice(0, 7)}</span>} />
         <CardSkeleton rows={3} />
         <CardSkeleton rows={8} />
       </div>
@@ -58,11 +58,6 @@ export default function CommitPage({ params }: { params: Promise<{ sha: string }
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={
-          <Link href={`${base}/commits`} className="hover:text-foreground">
-            Commits
-          </Link>
-        }
         title={data.subject}
         actions={
           <Button asChild size="sm" variant="outline">
@@ -71,7 +66,7 @@ export default function CommitPage({ params }: { params: Promise<{ sha: string }
         }
       />
 
-      <div className="animate-rise rounded-xl border bg-card p-5 [animation-delay:80ms]">
+      <div className="animate-rise rounded-xl border bg-card p-5 [animation-delay:40ms]">
         {body && <p className="mb-4 whitespace-pre-wrap text-sm text-muted-foreground">{body}</p>}
         <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
@@ -109,7 +104,7 @@ export default function CommitPage({ params }: { params: Promise<{ sha: string }
         <EmptyState icon={<GitCommitHorizontalIcon />} title="This commit changed no files" description="Empty commits only record a message." />
       ) : (
         <>
-          <section aria-labelledby="changed-files" className="animate-rise rounded-xl border bg-card [animation-delay:120ms]">
+          <section aria-labelledby="changed-files" className="animate-rise rounded-xl border bg-card [animation-delay:60ms]">
             <div className="flex flex-wrap items-baseline gap-x-3 border-b px-4 py-2.5">
               <h2 id="changed-files" className="text-sm font-medium">
                 {pluralize(data.files.length, "file")} changed
@@ -147,7 +142,7 @@ export default function CommitPage({ params }: { params: Promise<{ sha: string }
 
           <div className="space-y-4">
             {diffs.map((item, index) => (
-              <div key={`${item.path}-${index}`} id={anchor(index)} className="scroll-mt-28 animate-rise" style={{ animationDelay: `${160 + Math.min(index, 5) * 40}ms` }}>
+              <div key={`${item.path}-${index}`} id={anchor(index)} className="scroll-mt-28 animate-rise [animation-delay:80ms]">
                 <DiffView path={item.path} diff={item.diff} defaultOpen={diffs.length <= AUTO_OPEN_LIMIT} />
                 {statusByPath.get(item.path) !== "D" && (
                   <div className="mt-1 text-right">

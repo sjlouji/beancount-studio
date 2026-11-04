@@ -25,7 +25,7 @@ function count(n: number, noun: string): string {
 function People({ workspace }: { workspace: Workspace }) {
   const members = useMembers(workspace.slug);
   return (
-    <Card variant="muted" className="animate-rise [animation-delay:120ms]">
+    <Card variant="muted" className="animate-rise [animation-delay:60ms]">
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="type-headline">People</h2>
@@ -60,7 +60,7 @@ function Activity({ workspace }: { workspace: Workspace }) {
   if (activity.isError) return <ErrorState error={activity.error} onRetry={() => void activity.refetch()} />;
   if (activity.data.items.length === 0) return null;
   return (
-    <Card className="animate-rise [animation-delay:160ms]">
+    <Card className="animate-rise [animation-delay:80ms]">
       <CardContent>
         <h2 className="mb-3 type-headline">Recent activity</h2>
         <ol className="space-y-2.5">
@@ -93,7 +93,7 @@ function WorkspaceHome({ workspace }: { workspace: Workspace }) {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Workspace"
+       
         title={workspace.name}
         description={`${count(workspace.membersCount, "member")} · ${count(workspace.ledgersCount, "ledger")}. Every ledger is a git repository of plain-text files; pick one to open its reports, journal and files.`}
         actions={

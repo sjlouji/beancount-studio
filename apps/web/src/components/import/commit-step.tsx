@@ -162,7 +162,7 @@ export function CommitStep({ state, dispatch, onBack, onReset }: { state: Wizard
         </p>
       </section>
 
-      <section className="grid gap-4 rounded-xl border bg-card p-5 animate-rise [animation-delay:60ms] md:grid-cols-2">
+      <section className="grid gap-4 rounded-xl border bg-card p-5 animate-rise [animation-delay:30ms] md:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="target-file">Target file</Label>
           <Select value={chosenFile} onValueChange={setFilename}>

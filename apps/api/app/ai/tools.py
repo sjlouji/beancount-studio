@@ -12,17 +12,25 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from app.ai.documents import FORMATS as DOCUMENT_FORMATS
+from app.ai.documents import DocumentTable, build_document
 from app.core.deps import LedgerAccess, author_for
-from app.errors import AppError
+from app.db.base import get_session_factory
+from app.db.models import Upload
+from app.errors import AppError, LedgerError, ValidationError
 from app.ledgers import engine
 from app.ledgers.engine import ReportQuery
 from app.ledgers.store import LedgerRef, LedgerStore, safe_relative_path
 from app.logging_setup import get_logger
+from app.storage import get_storage
 
 log = get_logger(__name__)
 
 MAX_QUERY_ROWS = 200
 MAX_FILE_LINES = 1500
+# Documents hold whole tables (an export), so they read more rows than a chat answer.
+MAX_DOCUMENT_ROWS = 5000
+MAX_DOCUMENT_TABLES = 6
 
 APPROVAL_TOOL = "request_approval"
 
@@ -156,6 +164,41 @@ READ_TOOLS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {"files": _FILE_OP_SCHEMA},
             "required": ["files"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "create_document",
+        "description": (
+            "Make a file the user can preview and download: html, pdf, xlsx (Excel) or docx (Word). "
+            "Use it whenever the user asks for a report, export, spreadsheet, document or file. "
+            "Every figure must come from `tables`: give each a BQL query and the server runs it on the ledger, "
+            "so never type numbers into `body`. `body` is a short write-up in Markdown (# headings, - bullets, paragraphs)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "format": {"type": "string", "enum": list(DOCUMENT_FORMATS)},
+                "title": {
+                    "type": "string",
+                    "description": "The document's title; also its file name",
+                },
+                "body": {"type": "string", "description": "Short write-up in Markdown, no figures"},
+                "tables": {
+                    "type": "array",
+                    "maxItems": MAX_DOCUMENT_TABLES,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string"},
+                            "query": {"type": "string", "description": "A BQL query"},
+                        },
+                        "required": ["title", "query"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["format", "title"],
             "additionalProperties": False,
         },
     },
@@ -429,6 +472,8 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
                 "newErrors": new_errors,
                 "errorsAfter": len(projection.errors),
             }, False
+        if name == "create_document":
+            return await _create_document(ctx, args), False
         return {"error": f"Unknown tool {name}"}, True
     except AppError as exc:
         log.info("tool %s failed: %s", name, exc.message)
@@ -436,6 +481,82 @@ async def execute_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> tup
     except Exception as exc:  # the tool result must reach the model, so log and report
         log.error("tool %s crashed: %s", name, exc, exc_info=exc)
         return {"error": f"{exc.__class__.__name__}: {exc}"}, True
+
+
+def _document_filename(title: str, extension: str) -> str:
+    """The title as a file name: path separators and control characters out, 120 characters at most."""
+    safe = "".join("-" if ch in '/\\:*?"<>|' or ord(ch) < 32 else ch for ch in title).strip(" .-")
+    return f"{(safe or 'Document')[:120]}.{extension}"
+
+
+async def _create_document(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    """Runs the document's queries on the ledger, renders it, and stores it as the user's upload.
+
+    A table whose query fails fails the whole document (named in the error), so the user never
+    gets a document with a silently missing table.
+    """
+    store, access = ctx.store, ctx.access
+    ledger = access.ledger
+    user = access.auth.user
+    if user is None:
+        raise ValidationError("Documents need a signed-in user to own them")
+    fmt = args["format"]
+    if fmt not in DOCUMENT_FORMATS:
+        raise ValidationError(f"Unknown format {fmt!r}; use one of {', '.join(DOCUMENT_FORMATS)}")
+    tables: list[DocumentTable] = []
+    summaries = []
+    for spec in (args.get("tables") or [])[:MAX_DOCUMENT_TABLES]:
+        try:
+            result = await store.run(
+                ledger,
+                lambda f, q=spec["query"]: engine.run_query(
+                    f, ReportQuery(), q, max_rows=MAX_DOCUMENT_ROWS
+                ),
+            )
+        except LedgerError as exc:
+            raise ValidationError(
+                f"The query for table '{spec['title']}' failed: {exc.message}"
+            ) from exc
+        if result["type"] != "table":
+            raise ValidationError(f"The query for table '{spec['title']}' did not return a table")
+        tables.append(
+            DocumentTable(
+                title=spec["title"],
+                columns=[c["name"] for c in result["columns"]],
+                rows=result["rows"],
+            )
+        )
+        summaries.append(
+            {
+                "title": spec["title"],
+                "rowCount": result["rowCount"],
+                "truncated": result["truncated"],
+            }
+        )
+
+    extension, mime = DOCUMENT_FORMATS[fmt]
+    filename = _document_filename(args["title"], extension)
+    data = build_document(fmt, args["title"], args.get("body") or "", tables)
+    async with get_session_factory()() as db:
+        upload = Upload(
+            user_id=user.id, ledger_id=ledger.id, filename=filename, mime_type=mime, size=len(data)
+        )
+        db.add(upload)
+        await db.flush()
+        get_storage().upload_path(upload.id, upload.filename).write_bytes(data)
+        await db.commit()
+    log.info("assistant made %s (%d bytes) for user %s", filename, len(data), user.id)
+    return {
+        "document": {
+            "id": upload.id,
+            "filename": filename,
+            "format": fmt,
+            "mimeType": mime,
+            "size": len(data),
+            "url": f"/api/uploads/{upload.id}",
+        },
+        "tables": summaries,
+    }
 
 
 def approved_hashes_from_messages(messages: list[dict[str, Any]]) -> set[str]:

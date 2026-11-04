@@ -37,7 +37,7 @@ export default function IncomeStatementPage() {
   if (query.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Reports" title="Income statement" />
+        <PageHeader title="Income statement" />
         <CardSkeleton rows={8} />
         <div className="grid gap-4 lg:grid-cols-2">
           <CardSkeleton rows={6} />
@@ -58,7 +58,7 @@ export default function IncomeStatementPage() {
 
   const header = (
     <PageHeader
-      eyebrow="Reports"
+     
       title="Income statement"
       description={`What came in and what went out · ${period}`}
       actions={<ExportMenu fileName={`income-statement-${slug}`} build={buildReport} />}
@@ -122,7 +122,7 @@ export default function IncomeStatementPage() {
     <div className="space-y-6">
       {header}
       <ChartTabsCard
-        className="animate-rise [animation-delay:80ms]"
+        className="animate-rise [animation-delay:40ms]"
         title={`By ${interval}`}
         tabs={[
           { value: "netProfit", label: "Net profit", content: chart("netProfit") },
@@ -132,21 +132,21 @@ export default function IncomeStatementPage() {
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <HierarchyTable
-          className="animate-rise [animation-delay:120ms]"
+          className="animate-rise [animation-delay:60ms]"
           title="Income"
           root={trees.income}
           invert={invert}
           summaryRows={[{ label: "Total income", balance: trees.income.balanceChildren, emphasis: true }]}
         />
         <HierarchyTable
-          className="animate-rise [animation-delay:160ms]"
+          className="animate-rise [animation-delay:80ms]"
           title="Expenses"
           root={trees.expenses}
           summaryRows={[{ label: "Total expenses", balance: trees.expenses.balanceChildren, emphasis: true }]}
         />
       </div>
       <StatementSummary
-        className="animate-rise [animation-delay:200ms]"
+        className="animate-rise [animation-delay:80ms]"
         title="Net profit"
         precisions={precisions}
         items={[

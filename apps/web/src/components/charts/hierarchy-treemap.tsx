@@ -167,7 +167,7 @@ export function HierarchyTreemap({
         })}
       </svg>
       {hover && (
-        <div className="pointer-events-none absolute top-2 right-2 rounded-lg border bg-popover/95 px-3 py-2 text-xs shadow-float backdrop-blur">
+        <div className="pointer-events-none absolute top-2 right-2 rounded-lg border bg-card px-3 py-2 text-xs shadow-float">
           <div className="font-mono font-medium text-foreground">{hover.account}</div>
           <div className="tabular text-muted-foreground">
             {formatNumber(hover.value, digits)} {chartUnit} · {total > 0 ? ((hover.value / total) * 100).toFixed(1) : "0"}%

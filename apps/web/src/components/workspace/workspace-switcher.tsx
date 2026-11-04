@@ -49,7 +49,7 @@ export function WorkspaceSwitcher() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="press flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-sidebar-ring/40 data-open:bg-sidebar-accent"
+          className="press flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-sidebar-ring/40 data-open:bg-sidebar-accent"
           aria-label={`Workspace: ${name}. Switch workspace`}
         >
           <LedgerTile title={name} className="size-6 rounded-md text-[11px]" />

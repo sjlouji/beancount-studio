@@ -11,8 +11,8 @@ import { ledgerHref } from "@/lib/routes";
 /** One ledger in a workspace's grid: title, address, description and the latest commit. */
 export function LedgerCard({ ledger, index }: { ledger: Ledger; index: number }) {
   return (
-    <Link href={ledgerHref(ledger.workspace, ledger.slug)} className="group block animate-rise outline-none" style={{ animationDelay: `${index * 40}ms` }}>
-      <Card className="h-full transition-all group-hover:-translate-y-0.5 group-hover:border-primary/40 group-focus-visible:ring-3 group-focus-visible:ring-ring/50">
+    <Link href={ledgerHref(ledger.workspace, ledger.slug)} className="group block animate-rise outline-none" style={{ animationDelay: `${Math.min(index, 4) * 20}ms` }}>
+      <Card className="h-full transition-[translate,border-color] group-hover:-translate-y-0.5 group-hover:border-primary/40 group-focus-visible:ring-3 group-focus-visible:ring-ring/50">
         <CardContent className="flex h-full flex-col gap-3">
           <div className="flex items-start gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-secondary text-lg font-bold text-primary">{ledger.title.slice(0, 1).toUpperCase()}</div>

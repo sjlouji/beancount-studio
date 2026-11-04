@@ -17,9 +17,9 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Account" title="Settings" description="Your profile, appearance, credentials and programmatic access." />
+      <PageHeader title="Settings" description="Your profile, appearance, credentials and programmatic access." />
       <div className="grid gap-6 md:grid-cols-[13rem_minmax(0,1fr)] md:gap-10">
-        <nav aria-label="Settings" className="animate-rise [animation-delay:60ms]">
+        <nav aria-label="Settings" className="animate-rise [animation-delay:30ms]">
           <ul className="flex flex-col gap-1 md:sticky md:top-24">
             {NAV.map(({ href, label, icon: Icon, danger }) => {
               const active = pathname === href;
@@ -29,9 +29,9 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                     href={href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors hover:bg-muted",
-                      active ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
-                      danger && "text-negative hover:text-negative",
+                      "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+                      active ? "bg-primary font-medium text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      danger && !active && "text-negative hover:text-negative",
                     )}
                   >
                     <Icon className="size-4" />

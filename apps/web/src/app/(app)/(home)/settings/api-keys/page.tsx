@@ -77,7 +77,7 @@ function KeyRow({ apiKey, ledger, index, onRevoke }: { apiKey: ApiKey; ledger: L
   const inactive = revoked || expired;
   const ledgerLabel = apiKey.ledgerId === null ? "All ledgers" : (ledger?.title ?? "Unavailable ledger");
   return (
-    <Card className={cn("animate-rise", inactive && "bg-muted/40")} style={{ animationDelay: `${index * 40}ms` }}>
+    <Card className={cn("animate-rise", inactive && "bg-muted/40")} style={{ animationDelay: `${Math.min(index, 4) * 20}ms` }}>
       <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className={cn("flex min-w-0 flex-1 items-start gap-3", inactive && "text-muted-foreground")}>
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">

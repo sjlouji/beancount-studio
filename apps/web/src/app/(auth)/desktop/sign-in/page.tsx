@@ -48,7 +48,7 @@ function DesktopSignIn() {
   if (isPending || !me) {
     return (
       <div className="flex justify-center py-12">
-        <Spinner className="size-5" />
+        <Spinner className="size-5" label="Checking who is signed in" />
       </div>
     );
   }

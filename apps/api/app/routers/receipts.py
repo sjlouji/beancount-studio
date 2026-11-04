@@ -11,7 +11,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.ai.providers import AI_DISABLED_MESSAGE
 from app.ai.receipt import parse_receipt
-from app.core.deps import DbDep, LedgerReadDep, LedgerWriteDep, SettingsDep, UserDep, author_for
+from app.core.deps import (
+    AiSettingsDep,
+    DbDep,
+    LedgerReadDep,
+    LedgerWriteDep,
+    UserDep,
+    author_for,
+)
 from app.errors import FeatureDisabledError, ValidationError
 from app.importers.csv_import import render_transaction
 from app.ledgers import engine
@@ -31,7 +38,7 @@ class ParseRequest(BaseModel):
 
 @router.post("/parse")
 async def parse(
-    body: ParseRequest, access: LedgerReadDep, user: UserDep, db: DbDep, settings: SettingsDep
+    body: ParseRequest, access: LedgerReadDep, user: UserDep, db: DbDep, settings: AiSettingsDep
 ):
     if not settings.ai_enabled:
         raise FeatureDisabledError(

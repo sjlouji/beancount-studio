@@ -4,8 +4,11 @@ import { join } from "node:path";
 import { app } from "electron";
 import log from "electron-log/main";
 
+import { parseBounds, type Bounds } from "./window-bounds";
+
 export interface Settings {
   serverUrl?: string;
+  windowBounds?: Bounds;
 }
 
 const FILE_NAME = "settings.json";
@@ -36,18 +39,23 @@ export function readSettings(): { settings: Settings; problem?: string } {
     if (typeof parsed !== "object" || parsed === null) {
       throw new TypeError("settings root is not an object");
     }
-    const serverUrl = (parsed as Record<string, unknown>).serverUrl;
+    const { serverUrl, windowBounds } = parsed as Record<string, unknown>;
     if (serverUrl !== undefined && typeof serverUrl !== "string") {
       throw new TypeError("serverUrl is not a string");
     }
-    return { settings: { serverUrl } };
+    // A bad window position only costs the window its place; it never blocks connecting.
+    const bounds = parseBounds(windowBounds);
+    if (windowBounds !== undefined && !bounds) log.warn("settings: ignoring malformed windowBounds", windowBounds);
+    return { settings: { serverUrl, windowBounds: bounds } };
   } catch (error) {
     log.error("settings: malformed file", path, error);
     return { settings: {}, problem: `The settings file is malformed (${path}). Connect again.` };
   }
 }
 
-export function writeSettings(settings: Settings): void {
+/** Saves `changes` over what is already saved, so the server and the window position don't erase each other. */
+export function writeSettings(changes: Settings): void {
+  const merged = { ...readSettings().settings, ...changes };
   mkdirSync(app.getPath("userData"), { recursive: true });
-  writeFileSync(settingsPath(), `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+  writeFileSync(settingsPath(), `${JSON.stringify(merged, null, 2)}\n`, "utf8");
 }

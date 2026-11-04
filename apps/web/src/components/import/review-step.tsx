@@ -128,7 +128,7 @@ export function ReviewStep({
         </div>
       )}
 
-      <div className="animate-rise [animation-delay:60ms]">
+      <div className="animate-rise [animation-delay:30ms]">
         <ImportTable
           views={shown}
           selected={selected}

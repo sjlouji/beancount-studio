@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 /** Horizontal numbered stepper. Completed steps may be clicked to go back via `onSelect`. */
 export function Stepper({ steps, current, onSelect }: { steps: Array<{ label: string; hint: string }>; current: number; onSelect?: (index: number) => void }) {
   return (
-    <ol className="grid grid-cols-3 gap-2 animate-rise [animation-delay:90ms]" aria-label="Progress">
+    <ol className="grid grid-cols-3 gap-2 animate-rise [animation-delay:40ms]" aria-label="Progress">
       {steps.map((step, index) => {
         const done = index < current;
         const active = index === current;
@@ -30,7 +30,7 @@ export function Stepper({ steps, current, onSelect }: { steps: Array<{ label: st
         return (
           <li key={step.label} aria-current={active ? "step" : undefined} className="relative">
             {clickable ? (
-              <button type="button" onClick={() => onSelect(index)} className="flex w-full items-center gap-2.5 rounded-lg p-1.5 hover:bg-muted">
+              <button type="button" onClick={() => onSelect(index)} className="flex w-full items-center gap-2.5 rounded-lg p-1.5 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/40">
                 {body}
               </button>
             ) : (

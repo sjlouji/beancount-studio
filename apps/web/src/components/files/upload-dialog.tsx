@@ -1,17 +1,17 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { FileIcon, UploadCloudIcon, XIcon } from "lucide-react";
-import { useRef, useState, type DragEvent } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FileItem } from "@/components/ui/file";
+import { FileUpload, FileUploadList } from "@/components/ui/file-upload";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError, errorMessage } from "@/lib/api/client";
 import { ledgerPath, useInvalidateLedger } from "@/lib/api/hooks";
 import { formatBytes } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 interface UploadResult {
   files: string[];
@@ -62,9 +62,7 @@ export function UploadDialog({ workspace, slug, directory, open, onOpenChange }:
 
 function UploadForm({ workspace, slug, directory, onDone }: { workspace: string; slug: string; directory: string; onDone: () => void }) {
   const invalidate = useInvalidateLedger(workspace, slug);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState(0);
 
   const upload = useMutation({
@@ -80,17 +78,11 @@ function UploadForm({ workspace, slug, directory, onDone }: { workspace: string;
     },
   });
 
-  function addFiles(incoming: FileList | File[]) {
+  function addFiles(incoming: File[]) {
     setFiles((current) => {
       const seen = new Set(current.map((f) => `${f.name}:${f.size}`));
-      return [...current, ...Array.from(incoming).filter((f) => !seen.has(`${f.name}:${f.size}`))];
+      return [...current, ...incoming.filter((f) => !seen.has(`${f.name}:${f.size}`))];
     });
-  }
-
-  function onDrop(event: DragEvent) {
-    event.preventDefault();
-    setDragging(false);
-    if (event.dataTransfer.files.length > 0) addFiles(event.dataTransfer.files);
   }
 
   const total = files.reduce((sum, f) => sum + f.size, 0);
@@ -104,53 +96,26 @@ function UploadForm({ workspace, slug, directory, onDone }: { workspace: string;
         </DialogDescription>
       </DialogHeader>
 
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label="Choose files to upload"
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), inputRef.current?.click())}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
-        className={cn(
-          "flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed bg-surface/60 px-6 py-8 text-center text-sm outline-none transition-colors hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50",
-          dragging && "border-primary bg-primary/5",
+      <FileUpload multiple compact disabled={upload.isPending} onFiles={addFiles} title="Drop files here or click to browse" hint="Statements, receipts, or additional .bean files">
+        {files.length > 0 && (
+          <FileUploadList aria-label="Files to upload">
+            {files.map((file) => (
+              <li key={`${file.name}:${file.size}`}>
+                <FileItem
+                  variant="ghost"
+                  className="rounded-none"
+                  name={file.name}
+                  size={file.size}
+                  mimeType={file.type}
+                  mono
+                  disabled={upload.isPending}
+                  onRemove={() => setFiles((current) => current.filter((f) => f !== file))}
+                />
+              </li>
+            ))}
+          </FileUploadList>
         )}
-      >
-        <UploadCloudIcon className="size-6 text-muted-foreground" />
-        <div className="font-medium">Drop files here or click to browse</div>
-        <div className="text-xs text-muted-foreground">Statements, receipts, or additional .bean files</div>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          className="sr-only"
-          tabIndex={-1}
-          onChange={(e) => {
-            if (e.target.files) addFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
-      </div>
-
-      {files.length > 0 && (
-        <ul className="max-h-40 divide-y overflow-y-auto rounded-lg border text-sm scrollbar-thin">
-          {files.map((file) => (
-            <li key={`${file.name}:${file.size}`} className="flex items-center gap-2 px-3 py-1.5">
-              <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{file.name}</span>
-              <span className="tabular text-xs text-muted-foreground">{formatBytes(file.size)}</span>
-              <Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove ${file.name}`} disabled={upload.isPending} onClick={() => setFiles((c) => c.filter((f) => f !== file))}>
-                <XIcon />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
+      </FileUpload>
 
       {upload.isPending && (
         <div className="space-y-1.5" role="status" aria-live="polite">

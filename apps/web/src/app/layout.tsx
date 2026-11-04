@@ -25,8 +25,18 @@ export const metadata: Metadata = {
   icons: { icon: "/icon.svg" },
 };
 
+// Edge to edge on phones (the shell pads itself with env(safe-area-inset-*)); the browser chrome
+// and status bar take the colour of the top bar in each scheme.
 export const viewport: Viewport = {
-  themeColor: "#4a154b",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

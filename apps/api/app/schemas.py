@@ -380,3 +380,51 @@ class SystemInfo(BaseModel):
     has_users: bool = Field(alias="hasUsers")
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class OllamaModel(BaseModel):
+    name: str
+    size: int
+    family: str | None = None
+    parameter_size: str | None = Field(default=None, alias="parameterSize")
+    modified_at: str | None = Field(default=None, alias="modifiedAt")
+    capabilities: list[str] | None = None
+    # Whether the model calls tools, which the assistant needs; None when Ollama doesn't say.
+    can_chat: bool | None = Field(default=None, alias="canChat")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class OllamaServer(BaseModel):
+    base_url: str = Field(alias="baseUrl")
+    models: list[OllamaModel]
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class AiConnection(BaseModel):
+    base_url: str = Field(alias="baseUrl")
+    model: str
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class AiConnectionStatus(BaseModel):
+    """The assistant's model as an admin sees it: the provider in effect, the Ollama connection
+    made in the app (if any) and the Ollama server found on this machine (if any)."""
+
+    provider: str | None = None
+    model: str | None = None
+    connection: AiConnection | None = None
+    detected: OllamaServer | None = None
+    # A provider configured in the environment (BS_*), which a connection made here overrides.
+    environment_provider: str | None = Field(default=None, alias="environmentProvider")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class ConnectOllamaRequest(BaseModel):
+    base_url: str = Field(alias="baseUrl")
+    model: str
+
+    model_config = ConfigDict(populate_by_name=True)

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { BalanceAmounts } from "@/components/app/amount";
 import { accountHref, useLedgerContext } from "@/components/ledger/ledger-context";
+import { Meter } from "@/components/ui/meter";
 import type { Balance, BudgetsReport } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import { TD, TD_NUM, TH, TH_NUM } from "./helpers";
@@ -27,23 +28,31 @@ function budgetFigures(row: BudgetRow) {
   return { budget, actual, remaining, usage };
 }
 
-/** Under 80% is on track, up to 100% is close, beyond that is over budget. */
-function usageTone(usage: number): { bar: string; text: string; label: string } {
-  if (usage > 1) return { bar: "bg-negative", text: "text-negative", label: "Over budget" };
-  if (usage >= 0.8) return { bar: "bg-warning", text: "text-warning-foreground dark:text-warning", label: "Close to the limit" };
-  return { bar: "bg-positive", text: "text-positive", label: "On track" };
+/** Thresholds shared by the meter's colour and its spoken status: under 80% on track, up to 100% close, beyond that over. */
+const USAGE_LOW = 0.8;
+const USAGE_HIGH = 1;
+
+function usageLabel(usage: number): string {
+  if (usage > USAGE_HIGH) return "Over budget";
+  if (usage >= USAGE_LOW) return "Close to the limit";
+  return "On track";
 }
 
-function Meter({ usage }: { usage: number }) {
-  const tone = usageTone(usage);
-  const percent = Math.round(usage * 100);
+function UsageMeter({ account, usage }: { account: string; usage: number }) {
+  const status = usageLabel(usage);
   return (
-    <div className="flex items-center gap-2" title={tone.label}>
-      <div role="progressbar" aria-label={`${tone.label}, ${percent}% used`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(percent, 100)} className="h-1.5 w-24 overflow-hidden rounded-full bg-muted sm:w-32">
-        <div className={cn("h-full rounded-full", tone.bar)} style={{ width: `${Math.min(100, usage * 100)}%` }} />
-      </div>
-      <span className={cn("tabular w-10 text-right text-xs", tone.text)}>{percent}%</span>
-    </div>
+    <Meter
+      value={usage}
+      max={1}
+      low={USAGE_LOW}
+      high={USAGE_HIGH}
+      optimum={0}
+      showValue
+      label={`Budget used for ${account}`}
+      formatValue={(value) => `${Math.round(value * 100)}% used, ${status.toLowerCase()}`}
+      title={status}
+      className="w-36 sm:w-44"
+    />
   );
 }
 
@@ -91,7 +100,7 @@ export function BudgetTable({ rows }: { rows: BudgetRow[] }) {
                   <BalanceAmounts balance={figures.remaining} precisions={precisions} colored />
                 </td>
                 <td className={cn(TD, "pt-2.5")}>
-                  <Meter usage={figures.usage} />
+                  <UsageMeter account={row.account} usage={figures.usage} />
                 </td>
               </tr>
             );

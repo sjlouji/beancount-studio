@@ -9,9 +9,12 @@ import { TopBar } from "@/components/app/top-bar";
 import { PageSkeleton } from "@/components/app/states";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SkipLink } from "@/components/ui/skip-link";
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { cn } from "@/lib/utils";
 
-export const SIDEBAR_WIDTH = "17.5rem";
+// 240px: the width of a Mac app sidebar (Finder, Mail). Long names truncate; the content gets the room.
+export const SIDEBAR_WIDTH = "15rem";
 
 /**
  * The Slack frame: a full-width top bar, then the rail, the sidebar, the content column and an
@@ -23,7 +26,6 @@ export const SIDEBAR_WIDTH = "17.5rem";
 export function AppFrame({
   sidebar,
   header,
-  aside,
   children,
   searchLabel,
   onSearch,
@@ -33,7 +35,6 @@ export function AppFrame({
 }: {
   sidebar: ReactNode;
   header?: ReactNode;
-  aside?: ReactNode;
   children: ReactNode;
   searchLabel: string;
   onSearch: () => void;
@@ -46,33 +47,36 @@ export function AppFrame({
   // Picking a page or a section in the sheet navigates; the sheet gives way to the page.
   useEffect(() => setMobileSidebarOpen(false), [pathname, setMobileSidebarOpen]);
   return (
-    <div className="flex h-dvh flex-col bg-background">
+    <div className="flex h-dvh flex-col bg-background pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+      <SkipLink />
       <TopBar searchLabel={searchLabel} onSearch={onSearch} />
       <div className="flex min-h-0 flex-1">
         <Rail extra={railExtra} className="hidden md:flex" />
         <aside
           aria-label="Sidebar"
-          className={cn("hidden shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-out md:flex", sidebarOpen ? "w-(--sidebar-width)" : "w-0 border-r-0")}
+          className={cn("hidden shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex", sidebarOpen ? "w-(--sidebar-width)" : "w-0 border-r-0")}
           style={{ "--sidebar-width": SIDEBAR_WIDTH } as React.CSSProperties}
         >
           <div className="flex h-full w-(--sidebar-width) flex-col">{sidebar}</div>
         </aside>
         {/* Below md the tab bar is fixed over the viewport bottom; the column stops above it. */}
         <main className="flex min-w-0 flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
-          <div className="relative min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+          {/* The skip link lands on the scrolling column itself, so Space and the arrow keys scroll it. */}
+          <div id="main-content" tabIndex={-1} className="relative min-h-0 flex-1 overflow-y-auto outline-none scrollbar-thin">
             {header}
             <div className={cn("mx-auto w-full max-w-7xl px-4 py-5 md:px-8 md:py-7", contentClassName)}>{children}</div>
           </div>
         </main>
-        {aside}
       </div>
       <MobileTabBar items={mobileTabs} />
       <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-        <SheetContent side="left" className="w-[85vw] max-w-sm gap-0 bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Navigation</SheetTitle>
-            <SheetDescription>Sections and pages.</SheetDescription>
-          </SheetHeader>
+        <SheetContent side="left" className="w-[85vw] max-w-sm gap-0 bg-sidebar p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-sidebar-foreground [&>button]:hidden">
+          <VisuallyHidden asChild>
+            <SheetHeader>
+              <SheetTitle>Navigation</SheetTitle>
+              <SheetDescription>Sections and pages.</SheetDescription>
+            </SheetHeader>
+          </VisuallyHidden>
           <div className="flex h-full">
             <Rail extra={railExtra} className="flex" />
             <div className="flex h-full min-w-0 flex-1 flex-col">{sidebar}</div>
@@ -87,11 +91,11 @@ export function AppFrame({
 export function FrameSkeleton() {
   return (
     <div role="status" aria-label="Opening ledger" className="flex h-dvh flex-col bg-background">
-      <div className="flex h-11 shrink-0 items-center border-b border-border px-3">
+      <div className="flex h-[calc(2.75rem+env(safe-area-inset-top))] shrink-0 items-center border-b border-border px-3 pt-[env(safe-area-inset-top)]">
         <Skeleton className="mx-auto h-8 w-full max-w-2xl rounded-lg" />
       </div>
       <div className="flex min-h-0 flex-1">
-        <div className="hidden w-18 shrink-0 border-r border-sidebar-border bg-rail md:block" />
+        <div className="hidden w-14 shrink-0 border-r border-sidebar-border bg-rail md:block" />
         <div className="hidden w-(--sidebar-width) shrink-0 flex-col gap-3 border-r border-sidebar-border bg-sidebar p-3 md:flex" style={{ "--sidebar-width": SIDEBAR_WIDTH } as React.CSSProperties}>
           <Skeleton className="h-9 rounded-lg" />
           <Skeleton className="h-8 rounded-lg" />

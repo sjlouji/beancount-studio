@@ -139,8 +139,8 @@ function EntryEditorInner({ context, onSaved, onDeleted }: { context: EntryConte
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void destroy()} className="bg-destructive text-white hover:bg-destructive/90">
-              {remove.isPending ? <Spinner className="size-4" /> : "Delete"}
+            <AlertDialogAction variant="destructive" onClick={() => void destroy()}>
+              {remove.isPending ? <Spinner className="size-4" label="Deleting" /> : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

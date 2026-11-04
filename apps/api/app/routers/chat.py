@@ -7,8 +7,8 @@ from typing import Any
 from assistant_stream import create_run
 from assistant_stream.serialization import DataStreamResponse
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from sqlalchemy import select, update
 
 from app.ai.agent import AgentRun
 from app.ai.messages import (
@@ -18,9 +18,9 @@ from app.ai.messages import (
 )
 from app.ai.providers import AI_DISABLED_MESSAGE
 from app.ai.tools import approved_hashes_from_messages
-from app.core.deps import DbDep, LedgerReadDep, SettingsDep, UserDep
+from app.core.deps import AiSettingsDep, DbDep, LedgerReadDep, UserDep
 from app.db.base import get_session_factory
-from app.db.models import ChatThread
+from app.db.models import ChatThread, Upload, utcnow
 from app.errors import FeatureDisabledError, NotFoundError, ValidationError
 from app.ledgers.store import get_store
 from app.logging_setup import get_logger
@@ -40,15 +40,20 @@ class ThreadOut(BaseModel):
 
 
 def _thread_out(thread: ChatThread, *, with_messages: bool = False) -> dict[str, Any]:
+    payload = thread.messages or {}
+    ui = payload.get("ui", []) if isinstance(payload, dict) else payload
     out = {
         "id": thread.id,
         "title": thread.title,
+        # Lets the web reuse an empty conversation for "New chat" and leave it out of Recents.
+        "messageCount": len(ui),
+        "pinned": thread.pinned_at is not None,
+        "pinnedAt": thread.pinned_at,
         "createdAt": thread.created_at,
         "updatedAt": thread.updated_at,
     }
     if with_messages:
-        payload = thread.messages or {}
-        out["messages"] = payload.get("ui", []) if isinstance(payload, dict) else payload
+        out["messages"] = ui
     return out
 
 
@@ -86,19 +91,94 @@ async def get_thread(thread_id: str, access: LedgerReadDep, user: UserDep, db: D
 
 
 class ThreadUpdate(BaseModel):
-    title: str = Field(min_length=1, max_length=200)
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    pinned: bool | None = None
+
+    @model_validator(mode="after")
+    def _something_to_change(self) -> ThreadUpdate:
+        if self.title is None and self.pinned is None:
+            raise ValueError("Give a title or pinned")
+        return self
 
 
 @router.patch("/threads/{thread_id}")
-async def rename_thread(
+async def update_thread(
     thread_id: str, body: ThreadUpdate, access: LedgerReadDep, user: UserDep, db: DbDep
 ):
+    """Renames and/or stars a conversation. Neither is activity: `updatedAt` is kept, so the
+    conversation keeps its place among the recent ones."""
     thread = await db.get(ChatThread, thread_id)
     if thread is None or thread.user_id != user.id or thread.ledger_id != access.ledger.id:
         raise NotFoundError("Thread not found")
-    thread.title = body.title.strip()
+    values: dict[str, Any] = {"updated_at": thread.updated_at}
+    if body.title is not None:
+        title = body.title.strip()
+        if not title:
+            raise ValidationError("A conversation needs a title")
+        values["title"] = title
+    if body.pinned is not None:
+        values["pinned_at"] = (thread.pinned_at or utcnow()) if body.pinned else None
+    await db.execute(update(ChatThread).where(ChatThread.id == thread.id).values(**values))
     await db.commit()
+    await db.refresh(thread)
     return _thread_out(thread)
+
+
+def _document_ids(payload: Any) -> list[str]:
+    """Ids of the documents the assistant made in a stored conversation (create_document results)."""
+    messages = payload.get("ui", []) if isinstance(payload, dict) else payload or []
+    ids = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        for part in message.get("content") or []:
+            if not isinstance(part, dict) or part.get("toolName") != "create_document":
+                continue
+            result = part.get("result")
+            document = result.get("document") if isinstance(result, dict) else None
+            if isinstance(document, dict) and isinstance(document.get("id"), str):
+                ids.append(document["id"])
+    return ids
+
+
+@router.get("/files")
+async def list_files(access: LedgerReadDep, user: UserDep, db: DbDep):
+    """Every document the assistant made for this person in this ledger, newest first, with the
+    conversation it came from. A file whose upload is gone is left out."""
+    threads = (
+        await db.execute(
+            select(ChatThread)
+            .where(ChatThread.ledger_id == access.ledger.id, ChatThread.user_id == user.id)
+            .order_by(ChatThread.updated_at.desc())
+            .limit(200)
+        )
+    ).scalars()
+    origin: dict[str, ChatThread] = {}
+    for thread in threads:
+        for upload_id in _document_ids(thread.messages):
+            origin.setdefault(upload_id, thread)
+    if not origin:
+        return []
+    uploads = (
+        await db.execute(
+            select(Upload)
+            .where(Upload.id.in_(origin), Upload.user_id == user.id)
+            .order_by(Upload.created_at.desc())
+        )
+    ).scalars()
+    return [
+        {
+            "id": upload.id,
+            "filename": upload.filename,
+            "mimeType": upload.mime_type,
+            "size": upload.size,
+            "createdAt": upload.created_at,
+            "url": f"/api/uploads/{upload.id}",
+            "threadId": origin[upload.id].id,
+            "threadTitle": origin[upload.id].title,
+        }
+        for upload in uploads
+    ]
 
 
 @router.delete("/threads/{thread_id}", status_code=204)
@@ -162,7 +242,7 @@ async def _persist(
 
 @router.post("")
 async def chat(
-    request: Request, access: LedgerReadDep, user: UserDep, db: DbDep, settings: SettingsDep
+    request: Request, access: LedgerReadDep, user: UserDep, db: DbDep, settings: AiSettingsDep
 ):
     if not settings.ai_enabled:
         raise FeatureDisabledError(AI_DISABLED_MESSAGE)

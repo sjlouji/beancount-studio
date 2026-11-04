@@ -54,7 +54,7 @@ export default function ImportPage() {
   if (!canWrite) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Import" title="Bring in a statement" />
+        <PageHeader title="Bring in a statement" />
         <EmptyState icon={<LockIcon />} title="This ledger is read-only for you" description="Importing writes transactions to the ledger, which needs write access. Ask a workspace admin to change your role." />
       </div>
     );
@@ -65,7 +65,7 @@ export default function ImportPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Import"
+       
         title="Bring in a statement"
         description="Upload a bank or card export, check and categorise each row, then commit the new transactions to your ledger in one git commit."
       />

@@ -79,7 +79,7 @@ export function BalanceLineChart({
           <CartesianGrid stroke={CHART_GRID} vertical={false} />
           <XAxis dataKey="date" tickFormatter={(v) => (interval ? String(v).slice(0, interval === "year" ? 4 : 7) : String(v).slice(0, 7))} tick={{ fill: CHART_TEXT, fontSize: 11 }} axisLine={{ stroke: CHART_AXIS }} tickLine={false} minTickGap={32} />
           <YAxis tickFormatter={axisTick} tick={{ fill: CHART_TEXT, fontSize: 11 }} axisLine={false} tickLine={false} width={56} />
-          <Tooltip content={renderTooltip} cursor={{ stroke: CHART_AXIS, strokeWidth: 1 }} />
+          <Tooltip isAnimationActive={false} content={renderTooltip} cursor={{ stroke: CHART_AXIS, strokeWidth: 1 }} />
           {series.map((s, i) => (
             <Area
               key={i}
@@ -91,8 +91,7 @@ export function BalanceLineChart({
               fill={`url(#bl-fill-${i})`}
               dot={false}
               activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--card)" }}
-              isAnimationActive
-              animationDuration={600}
+              isAnimationActive={false}
             />
           ))}
         </AreaChart>

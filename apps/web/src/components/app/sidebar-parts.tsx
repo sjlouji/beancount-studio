@@ -14,7 +14,7 @@ export function SidebarFind({ label, onOpen }: { label: string; onOpen: () => vo
     <button
       type="button"
       onClick={onOpen}
-      className="press mx-3 mb-2 flex h-8 items-center gap-2 rounded-lg bg-fill px-2.5 text-left type-subhead text-sidebar-muted outline-none transition-colors hover:bg-fill-secondary focus-visible:ring-3 focus-visible:ring-sidebar-ring/40"
+      className="press mx-3 mb-2 flex h-8 items-center gap-2 rounded-lg bg-fill px-2.5 text-left type-subhead text-sidebar-muted outline-none hover:bg-fill-secondary focus-visible:ring-3 focus-visible:ring-sidebar-ring/40"
     >
       <SearchIcon className="size-4 shrink-0" />
       <span className="flex-1 truncate">{label}</span>
@@ -26,7 +26,7 @@ export function SidebarFind({ label, onOpen }: { label: string; onOpen: () => vo
 /** One row: icon or tile, label, optional trailing badge. Selected rows take the accent fill. */
 export function SidebarItem({ href, active, icon, label, trailing, onClick }: { href?: string; active?: boolean; icon?: ReactNode; label: string; trailing?: ReactNode; onClick?: () => void }) {
   const className = cn(
-    "press group/item flex h-7 w-full items-center gap-2 rounded-md px-2 text-left type-body outline-none transition-colors focus-visible:ring-3 focus-visible:ring-sidebar-ring/40",
+    "press group/item flex h-7 w-full items-center gap-2 rounded-md px-2 text-left type-body outline-none focus-visible:ring-3 focus-visible:ring-sidebar-ring/40",
     active ? "bg-sidebar-primary font-medium text-sidebar-primary-foreground" : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground",
   );
   const body = (

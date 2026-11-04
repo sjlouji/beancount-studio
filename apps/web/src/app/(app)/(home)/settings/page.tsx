@@ -1,5 +1,6 @@
 "use client";
 
+import { AssistantModelCard } from "@/components/ask/assistant-setup";
 import { AppearanceCard } from "@/components/settings/appearance-card";
 import { GitAccessCard } from "@/components/settings/git-access-card";
 import { PasswordCard } from "@/components/settings/password-card";
@@ -13,6 +14,7 @@ export default function GeneralSettingsPage() {
       <AppearanceCard />
       <PasswordCard />
       <GitAccessCard index={3} />
+      <AssistantModelCard index={4} />
       <SettingsCard title="Sessions" index={4}>
         <p className="-mt-3 max-w-2xl text-sm text-muted-foreground">
           Sign-ins last 30 days on each device. To end your session sooner, choose Sign out from the user menu in the top bar.

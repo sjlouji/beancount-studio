@@ -109,7 +109,7 @@ export function IntervalBarChart({
           <CartesianGrid stroke={CHART_GRID} vertical={false} />
           <XAxis dataKey="date" tickFormatter={(v) => dateTick(String(v), interval)} tick={{ fill: CHART_TEXT, fontSize: 11 }} axisLine={{ stroke: CHART_AXIS }} tickLine={false} minTickGap={24} />
           <YAxis tickFormatter={axisTick} tick={{ fill: CHART_TEXT, fontSize: 11 }} axisLine={false} tickLine={false} width={56} />
-          <Tooltip content={renderTooltip} cursor={{ fill: "color-mix(in oklch, var(--foreground) 5%, transparent)" }} />
+          <Tooltip isAnimationActive={false} content={renderTooltip} cursor={{ fill: "color-mix(in oklch, var(--foreground) 5%, transparent)" }} />
           {seriesKeys.map((key, i) => (
             <Bar
               key={key}
@@ -118,8 +118,7 @@ export function IntervalBarChart({
               fill={color ?? seriesColor(i)}
               radius={mode === "stacked" ? 0 : [4, 4, 0, 0]}
               maxBarSize={28}
-              isAnimationActive
-              animationDuration={500}
+              isAnimationActive={false}
               onClick={(entry) => onBarClick?.(String((entry as { date?: string }).date ?? ""))}
               className={onBarClick ? "cursor-pointer" : undefined}
             >

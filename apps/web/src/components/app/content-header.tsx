@@ -11,43 +11,39 @@ export interface HeaderTab {
 }
 
 /**
- * The channel-style header at the top of the content column: a title row with actions and a
- * tab row for the siblings of the current page. Sticky and translucent, so content scrolls
- * under it.
+ * The local nav at the top of the content column, as on apple.com's product pages: one 52px row
+ * with the title on the left, the section's pages beside it and the actions on the right, then the
+ * page's filters as a second quiet row. Static: sticky, the same glass and hairline on every page
+ * and at every scroll position, and nothing in it animates when the page changes.
  */
-export function ContentHeader({ title, subtitle, leading, actions, tabs, toolbar, className }: { title: ReactNode; subtitle?: ReactNode; leading?: ReactNode; actions?: ReactNode; tabs?: HeaderTab[]; toolbar?: ReactNode; className?: string }) {
+export function ContentHeader({ title, status, actions, tabs, toolbar, className }: { title: ReactNode; status?: ReactNode; actions?: ReactNode; tabs?: HeaderTab[]; toolbar?: ReactNode; className?: string }) {
   return (
     <div className={cn("material-bar sticky top-0 z-20 border-b border-border", className)}>
-      <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 pt-2.5 md:px-8">
-        {leading}
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <h2 className="truncate type-headline">{title}</h2>
-          </div>
-          {subtitle && <div className="truncate type-footnote text-muted-foreground">{subtitle}</div>}
+      <div className="mx-auto flex h-13 w-full max-w-7xl items-center gap-4 px-4 md:gap-6 md:px-8">
+        <div className="flex min-w-0 shrink items-center gap-2">
+          <h2 className="truncate type-headline">{title}</h2>
+          {status}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
+        {tabs && tabs.length > 0 && (
+          <nav aria-label="Section" className="-mx-1 flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-thin md:justify-end">
+            {tabs.map((tab) => (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                aria-current={tab.active ? "page" : undefined}
+                className={cn(
+                  "shrink-0 rounded-md px-2.5 py-1.5 type-subhead whitespace-nowrap outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/40",
+                  tab.active ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </nav>
+        )}
+        {actions && <div className={cn("flex shrink-0 items-center gap-1", !tabs?.length && "ml-auto")}>{actions}</div>}
       </div>
-      {tabs && tabs.length > 0 ? (
-        <nav aria-label="Section" className="mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto px-3 pt-1.5 scrollbar-thin md:px-7">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              aria-current={tab.active ? "page" : undefined}
-              className={cn(
-                "relative shrink-0 rounded-md px-2.5 py-2 type-subhead font-medium whitespace-nowrap outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/40",
-                tab.active ? "text-foreground after:absolute after:inset-x-2.5 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary" : "text-muted-foreground",
-              )}
-            >
-              {tab.label}
-            </Link>
-          ))}
-        </nav>
-      ) : (
-        <div className="h-2.5" />
-      )}
-      {toolbar && <div className="mx-auto w-full max-w-7xl border-t border-border px-4 py-1.5 md:px-8">{toolbar}</div>}
+      {toolbar && <div className="mx-auto w-full max-w-7xl px-2 pb-1.5 md:px-6">{toolbar}</div>}
     </div>
   );
 }

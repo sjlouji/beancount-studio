@@ -19,7 +19,7 @@ src/components/ui/*                   shadcn primitives, restyled to DESIGN.md (
 src/components/assistant-ui/*         assistant-ui registry components (do not edit)
 src/components/app/*                  the frame (AppFrame, Rail, TopBar, ContentHeader, MobileTabBar, sidebar-parts, home-search), FocusShell, PageHeader, states, Amount, theme toggle, user menu, command palette
 src/components/workspace/*            workspace pieces: switcher, sidebar, WorkspaceFrame, WorkspaceGate, members and invite-link cards, settings cards, ledger card, role and slug rules, useCurrentWorkspace()
-src/components/ledger/*               ledger pieces: context (incl. the Ask panel state), shell, sidebar, ledger-nav (one table of pages), ask-panel, filter bar, hierarchy table, entry cards/sheet, diff view, dialogs
+src/components/ledger/*               ledger pieces: context, shell, sidebar, ledger-nav (one table of pages), ask-panel, filter bar, hierarchy table, entry cards/sheet, diff view, dialogs
 src/components/charts/*               Recharts wrappers + chart primitives (palette, tooltip, legend)
 src/lib/api/client.ts                 api(), apiGet/apiPost/apiPut/apiPatch/apiDelete, ApiError, errorMessage()
 src/lib/api/types.ts                  every API response type
@@ -95,7 +95,7 @@ export default function Page() {
 
 - The frame is `AppFrame`: top bar, rail, sidebar, content column, optional right panel, mobile
   tab bar. Pages render inside the content column and never add their own chrome. Ledger pages
-  get the `ContentHeader` (title, route-derived tabs, filter toolbar) and the `AskPanel` beside them.
+  get the `ContentHeader` (title, route-derived tabs, filter toolbar). Ask (`/ask`) is a full page whose sidebar is `ChatSidebar`.
   Inside a ledger the rail carries the sections and the sidebar the current section's pages; the
   phone sheet shows rail and sidebar side by side. Every sidebar starts with the
   `WorkspaceSwitcher` (Slack's workspace name with a menu); a ledger sidebar adds the
@@ -113,18 +113,18 @@ export default function Page() {
   `type-large-title`, `type-title-1|2|3`, `type-headline`, `type-body`, `type-callout`,
   `type-subhead`, `type-footnote`, `type-caption`, `type-caption-2` (uppercase eyebrows and
   group labels).
-- Colours only through tokens: `bg-primary` (the accent, one filled button per view),
-  `bg-secondary` (accent wash with `text-secondary-foreground`), `bg-muted` / `bg-surface`
+- Colours only through tokens: `bg-primary` (black in light, white in dark: one filled button per view and the selected state),
+  `bg-secondary` (Apple grey with `text-secondary-foreground`), `bg-muted` / `bg-surface`
   (grouped grey), `bg-fill` / `bg-fill-secondary` (search fields, segmented controls, skeletons),
   `border` (hairline), `text-muted-foreground`, `text-link`, `text-positive` / `text-negative` /
   `text-warning`, `chart-1…8`. The frame uses `bg-sidebar`, `text-sidebar-foreground`,
   `text-sidebar-muted`, `bg-sidebar-accent`, `bg-sidebar-primary` (selected row) and `bg-rail`.
   Never raw hex in components.
-- Buttons: rounded rectangles. `default` is the filled accent button, `secondary` the tinted one,
+- Buttons: rounded rectangles. `default` is the filled primary (black / white) button, `secondary` the grey one,
   `outline` the hairline control, `ghost` for toolbars, `chip` the capsule filter. `size="lg"` for
   the one primary action of a view (PageHeader actions, submit buttons); `default`, `sm`, `xs`
   for toolbars and tables. Press feedback is built in; do not add hover colour flashes.
-- Inline links: the `link` utility (accent, underline on hover).
+- Inline links: the `link` utility (blue, underline on hover; blue is for links and focus only).
 - Cards: shadcn `Card` (12px radius, hairline, flat). `variant="muted"` for inset grouped
   panels, `variant="accent"` for the one filled band a view may carry. Titles are
   `type-headline`.
@@ -138,8 +138,8 @@ export default function Page() {
   otherwise use a solid token.
 - Public surfaces (auth pages) use the `aurora` backdrop; data pages stay on plain canvas.
 - Numbers: always `tabular` (utility class) in tables and lists; `formatNumber(value, precisions[currency] ?? 2)`.
-- Entrance motion: `animate-rise` on top-level blocks with staggered `[animation-delay:…ms]`. Nothing else should animate on load. Anything a person can drag or toggle moves on a `motion` spring with `bounce: 0`; check `useReducedMotion()` and fall back to a fade.
-- Dark mode is derived from the aubergine surface tokens and must work automatically — test by toggling the theme button.
+- Entrance motion: `animate-rise` on top-level blocks with `[animation-delay:…ms]` in 20ms steps, never above 80ms (lists: `Math.min(index, 4) * 20`). Nothing else should animate on load. Motion rules live in `DESIGN.md` § Motion; the `.claude/skills` animation skills are the review bar (see `CLAUDE.md`). Anything a person can drag or toggle moves on a `motion` spring with `bounce: 0`; check `useReducedMotion()` and fall back to a fade.
+- Dark mode is true black from the same tokens and must work automatically — test by toggling the theme button.
 - Responsive: grids collapse to one column below `lg`; tables may scroll horizontally inside `overflow-x-auto`; below `md` the frame shows the tab bar, so pages leave the bottom 6rem free (the frame pads it) and keep 44px touch targets.
 - Empty states say what to do next (link to Import, Editor, Ask).
 - Accessibility: every icon-only button has `aria-label`; tables have header rows; interactive rows are buttons or links.

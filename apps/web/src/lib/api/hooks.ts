@@ -7,7 +7,9 @@ import type {
   AccountJournalResponse,
   AccountReport,
   ActivityItem,
+  AiConnectionStatus,
   ApiKey,
+  ChatFile,
   BalanceSheetReport,
   BudgetsReport,
   CashFlowReport,
@@ -50,6 +52,7 @@ export const keys = {
   me: ["me"] as const,
   sshKey: ["ssh-key"] as const,
   system: ["system"] as const,
+  aiConnection: ["system", "ai"] as const,
   workspaces: ["workspaces"] as const,
   workspaceScope: (workspace: string, ...rest: unknown[]) => ["workspace", workspace, ...rest] as const,
   invite: (token: string) => ["invite", token] as const,
@@ -100,6 +103,35 @@ export function useMe(options?: Partial<UseQueryOptions<User | null>>) {
 
 export function useSystemInfo() {
   return useQuery<SystemInfo>({ queryKey: keys.system, queryFn: () => apiGet<SystemInfo>("/system/info"), staleTime: 10 * 60_000 });
+}
+
+/** The assistant's model connection (administrators only); probes for Ollama each time it loads. */
+export function useAiConnection(enabled = true) {
+  return useQuery<AiConnectionStatus>({ queryKey: keys.aiConnection, queryFn: () => apiGet<AiConnectionStatus>("/system/ai"), enabled, staleTime: 0 });
+}
+
+/** Connects the assistant to a model on an Ollama server; the whole app sees the change at once. */
+export function useConnectOllama() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { baseUrl: string; model: string }) => apiPut<AiConnectionStatus>("/system/ai/ollama", body),
+    onSuccess: (status) => {
+      qc.setQueryData(keys.aiConnection, status);
+      void qc.invalidateQueries({ queryKey: keys.system, exact: true });
+    },
+  });
+}
+
+/** Removes the Ollama connection; the server's environment provider (if any) applies again. */
+export function useDisconnectOllama() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiDelete<AiConnectionStatus>("/system/ai/ollama"),
+    onSuccess: (status) => {
+      qc.setQueryData(keys.aiConnection, status);
+      void qc.invalidateQueries({ queryKey: keys.system, exact: true });
+    },
+  });
 }
 
 /** Approves a desktop-app sign-in for the hash the app sent to the browser. */
@@ -560,5 +592,46 @@ export function useChatThread(workspace: string, slug: string, threadId: string 
     queryFn: () => apiGet<ChatThread>(`${ledgerPath(workspace, slug)}/chat/threads/${threadId}`),
     enabled: Boolean(threadId),
     staleTime: Infinity,
+  });
+}
+
+export function useCreateChatThread(workspace: string, slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<ChatThread>(`${ledgerPath(workspace, slug)}/chat/threads`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.ledgerScope(workspace, slug, "chat-threads") }),
+  });
+}
+
+/** Renames and/or stars a conversation; neither moves it among the recent ones. */
+export function useUpdateChatThread(workspace: string, slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; title?: string; pinned?: boolean }) => apiPatch<ChatThread>(`${ledgerPath(workspace, slug)}/chat/threads/${id}`, body),
+    onSuccess: (thread) => {
+      qc.setQueryData<ChatThread[]>(keys.ledgerScope(workspace, slug, "chat-threads"), (list) => list?.map((t) => (t.id === thread.id ? { ...t, ...thread } : t)));
+      qc.setQueryData<ChatThread>(keys.ledgerScope(workspace, slug, "chat-thread", thread.id), (current) => (current ? { ...current, ...thread, messages: current.messages } : current));
+      void qc.invalidateQueries({ queryKey: keys.ledgerScope(workspace, slug, "chat-files") });
+    },
+  });
+}
+
+export function useDeleteChatThread(workspace: string, slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiDelete<void>(`${ledgerPath(workspace, slug)}/chat/threads/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.ledgerScope(workspace, slug, "chat-threads") });
+      void qc.invalidateQueries({ queryKey: keys.ledgerScope(workspace, slug, "chat-files") });
+    },
+  });
+}
+
+/** Every document the assistant made in this ledger's conversations, newest first. */
+export function useChatFiles(workspace: string, slug: string, enabled = true) {
+  return useQuery<ChatFile[]>({
+    queryKey: keys.ledgerScope(workspace, slug, "chat-files"),
+    queryFn: () => apiGet<ChatFile[]>(`${ledgerPath(workspace, slug)}/chat/files`),
+    enabled,
   });
 }

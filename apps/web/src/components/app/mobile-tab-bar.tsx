@@ -15,7 +15,7 @@ export interface MobileTab {
 /** Below `md` the rail and sidebar fold into a tab bar at the bottom, as on iPhone. */
 export function MobileTabBar({ items }: { items: MobileTab[] }) {
   return (
-    <nav aria-label="Tab bar" className="material-bar fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-border pb-[env(safe-area-inset-bottom)] md:hidden">
+    <nav aria-label="Tab bar" className="material-bar fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-border pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:hidden">
       {items.map((item) => {
         const className = cn("press flex flex-1 flex-col items-center justify-center gap-0.5 py-2 type-caption outline-none focus-visible:ring-3 focus-visible:ring-ring/40", item.active ? "text-primary" : "text-muted-foreground");
         const body = (

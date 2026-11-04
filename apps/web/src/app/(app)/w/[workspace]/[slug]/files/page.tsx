@@ -60,7 +60,7 @@ export default function FilesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Repository"
+       
         title="Files"
         description={
           <>
@@ -70,7 +70,7 @@ export default function FilesPage() {
         actions={actions}
       />
 
-      <Breadcrumb className="animate-rise [animation-delay:80ms]">
+      <Breadcrumb className="animate-rise [animation-delay:40ms]">
         <BreadcrumbList className="font-mono text-[13px]">
           <BreadcrumbItem>
             {segments.length === 0 ? (
@@ -125,7 +125,7 @@ export default function FilesPage() {
           }
         />
       ) : (
-        <div className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:120ms]">
+        <div className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:60ms]">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

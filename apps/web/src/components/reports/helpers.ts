@@ -2,8 +2,9 @@ import type { Balance, DateBalance, DateRange, IntervalTotal } from "@/lib/api/t
 import { formatDate, precisionFor } from "@/lib/format";
 
 /** Shared table cell classes so every report table has the same rhythm. */
-export const TH = "px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-muted-foreground";
-export const TH_NUM = "px-3 py-2 text-right text-xs font-medium whitespace-nowrap text-muted-foreground";
+// Table headers: small grey uppercase labels (type-caption-2), as in Apple's statements. Same as ui/table TableHead.
+export const TH = "px-3 py-2 text-left type-caption-2 whitespace-nowrap text-muted-foreground";
+export const TH_NUM = "px-3 py-2 text-right type-caption-2 whitespace-nowrap text-muted-foreground";
 export const TD = "px-3 py-1.5 align-top";
 export const TD_NUM = "px-3 py-1.5 text-right align-top";
 

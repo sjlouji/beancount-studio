@@ -3,12 +3,14 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
 import { Slot } from "radix-ui"
 
-// DESIGN.md buttons: Apple rounded-rectangle controls. `default` is the one filled accent button
-// per view, `secondary` the tinted alternative (accent on an accent wash), `outline` the hairline
-// control, `ghost` the toolbar control, `chip` the capsule filter. Feedback is on the press
+// DESIGN.md buttons: Apple rounded-rectangle controls in monochrome. `default` is the one filled
+// primary button per view (black in light, white in dark), `secondary` Apple's grey button,
+// `outline` the hairline control, `ghost` the toolbar control, `chip` the capsule filter.
+// `destructive` is an outline button with red text; inside a dialog's footer it is the final
+// confirm and turns solid red (the only solid red in the interface). Feedback is on the press
 // itself (scale on :active), never a colour flash on release.
 const buttonVariants = cva(
-  "group/button press inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent font-semibold whitespace-nowrap transition-[background-color,color,box-shadow,border-color,transform] duration-100 ease-out outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button press inline-flex shrink-0 items-center justify-center rounded-md border border-transparent font-semibold whitespace-nowrap outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -20,7 +22,7 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground",
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/30",
+          "border-border bg-background text-negative shadow-xs hover:bg-negative/10 focus-visible:ring-destructive/30 in-data-[slot=alert-dialog-footer]:border-transparent in-data-[slot=alert-dialog-footer]:bg-negative in-data-[slot=alert-dialog-footer]:text-negative-foreground in-data-[slot=alert-dialog-footer]:shadow-none in-data-[slot=alert-dialog-footer]:hover:bg-negative/90 in-data-[slot=dialog-footer]:border-transparent in-data-[slot=dialog-footer]:bg-negative in-data-[slot=dialog-footer]:text-negative-foreground in-data-[slot=dialog-footer]:shadow-none in-data-[slot=dialog-footer]:hover:bg-negative/90",
         link: "text-link underline-offset-4 hover:text-link-hover hover:underline",
         chip: "rounded-full border-border bg-background text-foreground hover:bg-accent aria-expanded:bg-accent",
       },

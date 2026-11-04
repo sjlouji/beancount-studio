@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AccountCombobox } from "@/components/ledger/account-combobox";
 import { useLedgerContext } from "@/components/ledger/ledger-context";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -167,6 +168,11 @@ function NewEntryForm({ open, onOpenChange, initialKind = "Transaction", initial
   }
 
   async function submit(keepOpen: boolean) {
+    // The date field emits "" until it holds a whole, real date, and says why under the field.
+    if (!date) {
+      toast.error("Enter the entry's date as YYYY-MM-DD");
+      return;
+    }
     const entry = buildEntry();
     if (kind === "Transaction" && (entry.postings as unknown[]).length < 1) {
       toast.error("Add at least one posting");
@@ -211,10 +217,12 @@ function NewEntryForm({ open, onOpenChange, initialKind = "Transaction", initial
             void submit(false);
           }}
         >
-          <div className="grid grid-cols-[9.5rem_1fr] gap-3">
+          <div className="grid grid-cols-[11rem_1fr] gap-3">
             <Field>
-              <FieldLabel htmlFor="entry-date">Date</FieldLabel>
-              <Input id="entry-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="font-mono" />
+              <FieldLabel htmlFor="entry-date" id="entry-date-label">
+                Date
+              </FieldLabel>
+              <DatePicker id="entry-date" aria-labelledby="entry-date-label" value={date} onValueChange={setDate} required />
             </Field>
             {kind === "Transaction" && (
               <Field>

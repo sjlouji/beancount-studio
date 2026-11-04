@@ -11,6 +11,7 @@ import { TD, TD_NUM, TH, TH_NUM } from "@/components/reports/helpers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useStatistics } from "@/lib/api/hooks";
 import { formatDate } from "@/lib/format";
@@ -27,7 +28,7 @@ function StatusDot({ status }: { status: string | null }) {
   return (
     <span className="inline-flex items-center" title={info?.label ?? "No balance check"}>
       <span className={cn("size-2 rounded-full", info ? info.dot : "border border-muted-foreground/40")} aria-hidden />
-      <span className="sr-only">{info?.label ?? "No balance check"}</span>
+      <VisuallyHidden>{info?.label ?? "No balance check"}</VisuallyHidden>
     </span>
   );
 }
@@ -36,7 +37,7 @@ function BalanceDirectives({ text }: { text: string }) {
   const { isCopied, copyToClipboard } = useCopyToClipboard();
   return (
     <Collapsible asChild>
-      <Card className="animate-rise [animation-delay:240ms]">
+      <Card className="animate-rise [animation-delay:80ms]">
         <CardContent>
           <div className="flex items-center justify-between gap-3">
             <CollapsibleTrigger className="group flex items-center gap-1.5 text-sm font-medium">
@@ -65,7 +66,7 @@ export default function StatisticsPage() {
   if (query.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Reports" title="Statistics" />
+        <PageHeader title="Statistics" />
         <div className="grid gap-4 lg:grid-cols-2">
           <CardSkeleton rows={8} />
           <CardSkeleton rows={8} />
@@ -77,7 +78,7 @@ export default function StatisticsPage() {
   if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
 
   const data = query.data;
-  const header = <PageHeader eyebrow="Reports" title="Statistics" description="What the ledger contains, which accounts are busiest, and which are due a balance check." />;
+  const header = <PageHeader title="Statistics" description="What the ledger contains, which accounts are busiest, and which are due a balance check." />;
 
   if (data.entriesByType.every((row) => row.count === 0)) {
     return (
@@ -103,13 +104,13 @@ export default function StatisticsPage() {
     <div className="space-y-6">
       {header}
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Card className="animate-rise [animation-delay:80ms]">
+        <Card className="animate-rise [animation-delay:40ms]">
           <CardContent>
             <h2 className="mb-3 text-sm font-medium">Entries by type</h2>
             <BarList items={byType.map((row) => ({ key: row.type, label: row.type, value: row.count }))} />
           </CardContent>
         </Card>
-        <Card className="animate-rise [animation-delay:120ms]">
+        <Card className="animate-rise [animation-delay:60ms]">
           <CardContent>
             <h2 className="mb-3 text-sm font-medium">
               Postings per account <span className="font-normal text-muted-foreground">· top {topAccounts.length}</span>
@@ -123,7 +124,7 @@ export default function StatisticsPage() {
         </Card>
       </div>
 
-      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:160ms]" aria-labelledby="last-entries">
+      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:80ms]" aria-labelledby="last-entries">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2.5">
           <h3 id="last-entries" className="text-sm font-medium">
             Last entry per account
@@ -149,7 +150,7 @@ export default function StatisticsPage() {
               <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]">
                 <tr>
                   <th scope="col" className={cn(TH, "w-8")}>
-                    <span className="sr-only">Status</span>
+                    <VisuallyHidden>Status</VisuallyHidden>
                   </th>
                   <th scope="col" className={TH}>
                     Account

@@ -26,8 +26,8 @@ export function initialsOf(name: string): string {
 /** The person's avatar: a rounded square with initials, as in the rail and the member lists. */
 export function UserAvatar({ name, className }: { name: string; className?: string }) {
   return (
-    <Avatar className={cn("size-7 rounded-lg", className)}>
-      <AvatarFallback className="rounded-lg bg-secondary text-[11px] font-semibold text-secondary-foreground">{initialsOf(name)}</AvatarFallback>
+    <Avatar className={cn("size-7", className)}>
+      <AvatarFallback className="bg-secondary text-[11px] font-semibold text-secondary-foreground">{initialsOf(name)}</AvatarFallback>
     </Avatar>
   );
 }

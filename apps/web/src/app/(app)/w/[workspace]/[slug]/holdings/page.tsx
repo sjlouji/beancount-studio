@@ -7,7 +7,7 @@ import { CardSkeleton, EmptyState, ErrorState } from "@/components/app/states";
 import { useLedgerContext } from "@/components/ledger/ledger-context";
 import { HoldingsTable } from "@/components/reports/holdings-table";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useHoldings } from "@/lib/api/hooks";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ export default function HoldingsPage() {
   const group = GROUPS.find((g) => g.value === groupBy)!;
 
   const header = (
-    <PageHeader eyebrow="Reports" title="Holdings" description="What you own today at cost and at market value, with unrealized profit and loss." />
+    <PageHeader title="Holdings" description="What you own today at cost and at market value, with unrealized profit and loss." />
   );
 
   if (query.isPending) {
@@ -44,19 +44,18 @@ export default function HoldingsPage() {
   return (
     <div className="space-y-6">
       {header}
-      <Tabs value={groupBy} onValueChange={(value) => setGroupBy(value as GroupBy)} className="animate-rise [animation-delay:80ms]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <TabsList>
-            {GROUPS.map((g) => (
-              <TabsTrigger key={g.value} value={g.value}>
-                {g.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <p className="text-xs text-muted-foreground">{group.hint}</p>
-        </div>
-      </Tabs>
-      <section className={cn("animate-rise overflow-hidden rounded-xl border bg-card transition-opacity [animation-delay:120ms]", query.isFetching && "opacity-70")} aria-label={`Holdings ${group.label.toLowerCase()}`}>
+      {/* A segmented control, not tabs: it changes how one table is grouped, it doesn't switch panels. */}
+      <div className="flex animate-rise flex-wrap items-center justify-between gap-3 [animation-delay:40ms]">
+        <ToggleGroup type="single" variant="outline" size="sm" value={groupBy} onValueChange={(value) => value && setGroupBy(value as GroupBy)} aria-label="Group holdings">
+          {GROUPS.map((g) => (
+            <ToggleGroupItem key={g.value} value={g.value}>
+              {g.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <p className="text-xs text-muted-foreground">{group.hint}</p>
+      </div>
+      <section className={cn("animate-rise overflow-hidden rounded-xl border bg-card transition-opacity [animation-delay:60ms]", query.isFetching && "opacity-70")} aria-label={`Holdings ${group.label.toLowerCase()}`}>
         {result.type === "text" ? (
           <pre className="overflow-auto p-4 font-mono text-xs">{result.contents}</pre>
         ) : result.rows.length === 0 ? (

@@ -15,7 +15,7 @@ export function TopBar({ searchLabel, onSearch }: { searchLabel: string; onSearc
   const router = useRouter();
   const { toggleSidebar, setMobileSidebarOpen } = useFrameState();
   return (
-    <header className="material-bar z-30 flex h-11 shrink-0 items-center gap-2 border-b border-border px-2 md:px-3">
+    <header className="titlebar z-30 flex h-[calc(2.75rem+env(safe-area-inset-top))] shrink-0 items-center pt-[env(safe-area-inset-top)] gap-2 border-b border-border bg-background pr-2 md:pr-3">
       <div className="flex items-center gap-0.5">
         <Button variant="ghost" size="icon-sm" className="md:hidden" aria-label="Open navigation" onClick={() => setMobileSidebarOpen(true)}>
           <MenuIcon />
@@ -39,7 +39,7 @@ export function TopBar({ searchLabel, onSearch }: { searchLabel: string; onSearc
       <button
         type="button"
         onClick={onSearch}
-        className="press mx-auto flex h-8 w-full max-w-2xl items-center gap-2 rounded-lg bg-fill px-3 text-left type-subhead text-muted-foreground outline-none transition-colors hover:bg-fill-secondary focus-visible:ring-3 focus-visible:ring-ring/40"
+        className="press mx-auto flex h-8 w-full max-w-2xl items-center gap-2 rounded-lg bg-fill px-3 text-left type-subhead text-muted-foreground outline-none hover:bg-fill-secondary focus-visible:ring-3 focus-visible:ring-ring/40"
         aria-label={searchLabel}
       >
         <SearchIcon className="size-4 shrink-0" />

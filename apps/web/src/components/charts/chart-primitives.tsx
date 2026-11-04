@@ -49,7 +49,7 @@ export interface TooltipRow {
 /** Shared tooltip chrome: title, rows with swatches, total. */
 export function ChartTooltipCard({ title, rows, total, footer }: { title: ReactNode; rows: TooltipRow[]; total?: TooltipRow | null; footer?: ReactNode }) {
   return (
-    <div className="min-w-44 rounded-lg border bg-popover/95 px-3 py-2 text-xs shadow-float backdrop-blur">
+    <div className="min-w-44 rounded-lg border bg-card px-3 py-2 text-xs shadow-float">
       <div className="mb-1.5 font-medium text-foreground">{title}</div>
       <div className="space-y-1">
         {rows.map((row) => (

@@ -261,6 +261,8 @@ class ChatThread(TimestampMixin, Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     title: Mapped[str] = mapped_column(String(200), default="New conversation")
     messages: Mapped[list] = mapped_column(JSON, default=list)  # assistant-ui ThreadMessageLike[]
+    # When the person starred (pinned) it; starred conversations list above the recent ones.
+    pinned_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 
 class DesktopSignIn(Base):
@@ -293,3 +295,18 @@ class Upload(Base):
     mime_type: Mapped[str] = mapped_column(String(120))
     size: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=utcnow)
+
+
+class InstanceSetting(Base):
+    """A setting of the whole instance that an admin changes in the app, by key (e.g. `ai.ollama`):
+    configuration, never ledger content. The environment holds the defaults; a stored setting
+    is laid over them (see `app.ai.connection`)."""
+
+    __tablename__ = "instance_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_by_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), default=utcnow, onupdate=utcnow)

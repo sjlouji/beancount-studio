@@ -23,7 +23,7 @@ export function SettingsCard({
     <Card
       id={id}
       className={cn("animate-rise scroll-mt-20", tone === "danger" && "bg-negative/5 ring-negative/30")}
-      style={{ animationDelay: `${index * 60}ms` }}
+      style={{ animationDelay: `${Math.min(index, 4) * 20}ms` }}
     >
       <CardContent className="space-y-5">
         <div>

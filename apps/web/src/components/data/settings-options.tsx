@@ -10,7 +10,7 @@ import { ledgerPath, useOptions } from "@/lib/api/hooks";
 
 export function ExportCard({ workspace, slug }: { workspace: string; slug: string }) {
   return (
-    <Card className="animate-rise [animation-delay:120ms]">
+    <Card className="animate-rise [animation-delay:60ms]">
       <CardHeader>
         <CardTitle className="text-sm font-medium">Export</CardTitle>
         <CardDescription>Download the whole ledger repository, including its git history, as a zip archive.</CardDescription>
@@ -59,7 +59,7 @@ export function OptionsCard({ workspace, slug }: { workspace: string; slug: stri
   const options = useOptions(workspace, slug);
   return (
     <Collapsible asChild>
-      <Card className="animate-rise [animation-delay:160ms]">
+      <Card className="animate-rise [animation-delay:80ms]">
         <CardHeader>
           <CollapsibleTrigger className="group flex w-full items-center gap-2 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
             <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />

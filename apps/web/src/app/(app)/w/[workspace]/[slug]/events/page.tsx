@@ -8,6 +8,7 @@ import { EventTimeline, useEventTypes } from "@/components/data/event-timeline";
 import { EntryContextSheet } from "@/components/ledger/entry-context-sheet";
 import { EntryBadgeList } from "@/components/ledger/entry-row";
 import { useLedgerContext } from "@/components/ledger/ledger-context";
+import { Accordion } from "@/components/ui/accordion";
 import { useEvents } from "@/lib/api/hooks";
 import type { Entry } from "@/lib/api/types";
 
@@ -34,8 +35,11 @@ export default function EventsPage() {
 
   const typeNames = groups.map(([type]) => type);
   const active = useMemo(() => new Set(typeNames.filter((t) => !hidden.has(t))), [typeNames, hidden]);
+  const shown = groups.filter(([type]) => active.has(type));
+  // Timelines open by default; this holds the types the reader folded.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
-  const header = <PageHeader eyebrow="Events" title="Life events, in time" description="Beancount `event` directives, grouped by type. Each type reads as its own timeline, newest first." />;
+  const header = <PageHeader title="Life events, in time" description="Beancount `event` directives, grouped by type. Each type reads as its own timeline, newest first." />;
 
   if (events.isPending || (events.data?.length && typesPending)) {
     return (
@@ -64,7 +68,7 @@ export default function EventsPage() {
         />
       ) : (
         <>
-          <div className="animate-rise [animation-delay:80ms]">
+          <div className="animate-rise [animation-delay:40ms]">
             <EntryBadgeList
               types={typeNames}
               active={active}
@@ -78,14 +82,26 @@ export default function EventsPage() {
               }
             />
           </div>
-          <div className="space-y-3 animate-rise [animation-delay:120ms]">
-            {groups
-              .filter(([type]) => active.has(type))
-              .map(([type, list]) => (
-                <EventTimeline key={type} type={type} events={list} onOpen={setOpenEntry} />
-              ))}
+          <Accordion
+            type="multiple"
+            value={shown.map(([type]) => type).filter((type) => !collapsed.has(type))}
+            onValueChange={(open) =>
+              setCollapsed((prev) => {
+                const next = new Set(prev);
+                for (const [type] of shown) {
+                  if (open.includes(type)) next.delete(type);
+                  else next.add(type);
+                }
+                return next;
+              })
+            }
+            className="space-y-3 animate-rise [animation-delay:60ms]"
+          >
+            {shown.map(([type, list]) => (
+              <EventTimeline key={type} type={type} events={list} onOpen={setOpenEntry} />
+            ))}
             {active.size === 0 && <EmptyState title="All event types are hidden" description="Select a type above to show its timeline." />}
-          </div>
+          </Accordion>
         </>
       )}
       <EntryContextSheet entryHash={openEntry} onOpenChange={(open) => !open && setOpenEntry(null)} />

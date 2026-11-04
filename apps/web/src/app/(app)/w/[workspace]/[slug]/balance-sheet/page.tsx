@@ -33,7 +33,7 @@ export default function BalanceSheetPage() {
   if (query.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Reports" title="Balance sheet" />
+        <PageHeader title="Balance sheet" />
         <CardSkeleton rows={8} />
         <div className="grid gap-4 lg:grid-cols-3">
           <CardSkeleton rows={6} />
@@ -60,7 +60,7 @@ export default function BalanceSheetPage() {
 
   const header = (
     <PageHeader
-      eyebrow="Reports"
+     
       title="Balance sheet"
       description={`Unaudited management statement · as of ${asOf} · ${rangeLabel(data.dateRange)}`}
       actions={<ExportMenu fileName={`balance-sheet-${slug}`} build={buildReport} />}
@@ -112,7 +112,7 @@ export default function BalanceSheetPage() {
   return (
     <div className="space-y-6">
       {header}
-      <Card className="animate-rise [animation-delay:80ms]">
+      <Card className="animate-rise [animation-delay:40ms]">
         <CardContent>
           <h2 className="mb-2 text-sm font-medium">Net worth, assets and liabilities</h2>
           <BalanceLineChart
@@ -130,12 +130,12 @@ export default function BalanceSheetPage() {
         </CardContent>
       </Card>
       <div className="grid items-start gap-4 lg:grid-cols-3">
-        <HierarchyTable className="animate-rise [animation-delay:120ms]" title="Assets" root={trees.assets} summaryRows={[{ label: "Total assets", balance: assets, emphasis: true }]} />
-        <HierarchyTable className="animate-rise [animation-delay:160ms]" title="Liabilities" root={trees.liabilities} invert={invert} summaryRows={[{ label: "Total liabilities", balance: trees.liabilities.balanceChildren, emphasis: true }]} />
-        <HierarchyTable className="animate-rise [animation-delay:200ms]" title="Equity" root={trees.equity} invert={invert} summaryRows={[{ label: "Total equity", balance: trees.equity.balanceChildren, emphasis: true }]} />
+        <HierarchyTable className="animate-rise [animation-delay:60ms]" title="Assets" root={trees.assets} summaryRows={[{ label: "Total assets", balance: assets, emphasis: true }]} />
+        <HierarchyTable className="animate-rise [animation-delay:80ms]" title="Liabilities" root={trees.liabilities} invert={invert} summaryRows={[{ label: "Total liabilities", balance: trees.liabilities.balanceChildren, emphasis: true }]} />
+        <HierarchyTable className="animate-rise [animation-delay:80ms]" title="Equity" root={trees.equity} invert={invert} summaryRows={[{ label: "Total equity", balance: trees.equity.balanceChildren, emphasis: true }]} />
       </div>
       <StatementSummary
-        className="animate-rise [animation-delay:240ms]"
+        className="animate-rise [animation-delay:80ms]"
         title="Reconciliation"
         precisions={precisions}
         items={[

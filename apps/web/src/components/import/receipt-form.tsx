@@ -4,6 +4,7 @@ import { ReceiptIcon, WalletIcon } from "lucide-react";
 import { AccountCombobox } from "@/components/ledger/account-combobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
@@ -34,7 +35,9 @@ export function parseTags(text: string): string[] {
 function Field({ label, htmlFor, children, className }: { label: string; htmlFor: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
+      <Label htmlFor={htmlFor} id={`${htmlFor}-label`}>
+        {label}
+      </Label>
       {children}
     </div>
   );
@@ -83,7 +86,7 @@ export function ReceiptForm({
       <h2 className="text-sm font-medium">Transaction</h2>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Date" htmlFor="r-date">
-          <Input id="r-date" type="date" value={values.date} onChange={(e) => set("date")(e.target.value)} className="tabular" required />
+          <DatePicker id="r-date" aria-labelledby="r-date-label" value={values.date} onValueChange={set("date")} required />
         </Field>
         <Field label="Payee" htmlFor="r-payee">
           <Input id="r-payee" value={values.payee} onChange={(e) => set("payee")(e.target.value)} />

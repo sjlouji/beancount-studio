@@ -50,6 +50,20 @@ async def user(client: AsyncClient) -> dict:
 
 
 @pytest.fixture
+async def admin(user: dict) -> dict:
+    """The fixture user, promoted: only the first account of a database is an administrator."""
+    from app.db.base import get_session_factory
+    from app.db.models import User
+
+    async with get_session_factory()() as db:
+        row = await db.get(User, user["id"])
+        assert row is not None
+        row.is_admin = True
+        await db.commit()
+    return user
+
+
+@pytest.fixture
 async def workspace(client: AsyncClient, user: dict) -> dict:
     import uuid
 

@@ -1,14 +1,15 @@
 "use client";
 
-import { ChevronRightIcon, FileCodeIcon, MoreHorizontalIcon, PlusIcon, XCircleIcon } from "lucide-react";
+import { FileCodeIcon, MoreHorizontalIcon, PlusIcon, XCircleIcon } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import { BalanceAmounts } from "@/components/app/amount";
 import { accountHref, useLedgerContext } from "@/components/ledger/ledger-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Treegrid, TreegridCell, TreegridRow, TreegridToggle } from "@/components/ui/treegrid";
 import type { AccountDetail, Balance } from "@/lib/api/types";
 import { accountLeaf } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,9 @@ interface TreeItem {
 interface Row {
   name: string;
   level: number;
+  /** Position among its siblings (1-based) and their count, for the treegrid. */
+  posinset: number;
+  setsize: number;
   detail: AccountDetail | null;
   hasChildren: boolean;
   aggregate: Balance;
@@ -67,14 +71,19 @@ function aggregateOf(node: TreeItem): Balance {
   return total;
 }
 
+function sortedChildren(node: TreeItem): TreeItem[] {
+  return Array.from(node.children.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function flatten(root: TreeItem, collapsed: Set<string>, forceOpen: boolean): Row[] {
   const rows: Row[] = [];
-  const walk = (node: TreeItem, level: number) => {
-    const children = Array.from(node.children.values()).sort((a, b) => a.name.localeCompare(b.name));
-    rows.push({ name: node.name, level, detail: node.detail, hasChildren: children.length > 0, aggregate: aggregateOf(node) });
-    if (forceOpen || !collapsed.has(node.name)) for (const child of children) walk(child, level + 1);
+  const walk = (node: TreeItem, level: number, posinset: number, setsize: number) => {
+    const children = sortedChildren(node);
+    rows.push({ name: node.name, level, posinset, setsize, detail: node.detail, hasChildren: children.length > 0, aggregate: aggregateOf(node) });
+    if (forceOpen || !collapsed.has(node.name)) children.forEach((child, index) => walk(child, level + 1, index + 1, children.length));
   };
-  for (const child of Array.from(root.children.values()).sort((a, b) => a.name.localeCompare(b.name))) walk(child, 0);
+  const top = sortedChildren(root);
+  top.forEach((child, index) => walk(child, 0, index + 1, top.length));
   return rows;
 }
 
@@ -117,15 +126,15 @@ export function AccountsTable({
 
   const rows = useMemo<Row[]>(() => {
     if (mode === "table") {
-      return accounts.map((detail) => ({ name: detail.account, level: 0, detail, hasChildren: false, aggregate: detail.balanceChildren }));
+      return accounts.map((detail, index) => ({ name: detail.account, level: 0, posinset: index + 1, setsize: accounts.length, detail, hasChildren: false, aggregate: detail.balanceChildren }));
     }
     return flatten(buildTree(accounts), collapsed, forceOpen);
   }, [accounts, mode, collapsed, forceOpen]);
 
-  const toggle = (name: string) =>
+  const setOpen = (name: string, open: boolean) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
+      if (open) next.delete(name);
       else next.add(name);
       return next;
     });
@@ -142,116 +151,125 @@ export function AccountsTable({
           </Button>
         </header>
       )}
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead>Account</TableHead>
-            <TableHead>Opened</TableHead>
-            <TableHead>Closed</TableHead>
-            <TableHead>Currencies</TableHead>
-            <TableHead className="text-right">Balance</TableHead>
-            <TableHead className="text-right">Entries</TableHead>
-            <TableHead>Last entry</TableHead>
-            <TableHead className="w-12">Status</TableHead>
-            {canWrite && (
-              <TableHead className="w-10">
-                <span className="sr-only">Actions</span>
+      <Treegrid asChild aria-label="Accounts">
+        <Table>
+          <TableHeader>
+            <TableRow role="row" className="hover:bg-transparent">
+              <TableHead role="columnheader">Account</TableHead>
+              <TableHead role="columnheader">Opened</TableHead>
+              <TableHead role="columnheader">Closed</TableHead>
+              <TableHead role="columnheader">Currencies</TableHead>
+              <TableHead role="columnheader" className="text-right">
+                Balance
               </TableHead>
-            )}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => {
-            const { detail } = row;
-            const isOpen = forceOpen || !collapsed.has(row.name);
-            return (
-              <TableRow key={row.name} className={cn(detail?.closedAt && "text-muted-foreground")}>
-                <TableCell style={{ paddingLeft: `${0.5 + row.level * 1.1}rem` }}>
-                  <span className="flex items-center gap-1">
-                    {mode === "tree" &&
-                      (row.hasChildren ? (
-                        <button
-                          type="button"
-                          onClick={() => toggle(row.name)}
-                          aria-expanded={isOpen}
-                          aria-label={`${isOpen ? "Collapse" : "Expand"} ${row.name}`}
-                          className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        >
-                          <ChevronRightIcon className={cn("size-3.5 transition-transform", isOpen && "rotate-90")} />
-                        </button>
-                      ) : (
-                        <span className="inline-block size-4.5" />
-                      ))}
-                    {detail ? (
-                      <Link href={accountHref(base, row.name, queryString)} className="truncate font-mono text-[13px] hover:underline">
-                        {mode === "tree" ? accountLeaf(row.name) : row.name}
-                      </Link>
-                    ) : (
-                      <span className="truncate font-mono text-[13px] text-muted-foreground">{accountLeaf(row.name)}</span>
-                    )}
-                  </span>
-                </TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">{detail?.openedAt}</TableCell>
-                <TableCell className="font-mono text-xs">{detail?.closedAt ?? ""}</TableCell>
-                <TableCell>
-                  {detail && detail.currencies.length > 0 && (
-                    <span className="flex flex-wrap gap-1">
-                      {detail.currencies.map((currency) => (
-                        <Badge key={currency} variant="outline" className="font-mono text-[11px]">
-                          {currency}
-                        </Badge>
-                      ))}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <BalanceAmounts balance={row.aggregate} precisions={precisions} emptyLabel="" />
-                </TableCell>
-                <TableCell className="tabular text-right">{detail?.entryCount.toLocaleString()}</TableCell>
-                <TableCell>
-                  {detail?.lastEntry && (
-                    <Link href={`${base}/entry/${detail.lastEntry.entryHash}`} className="font-mono text-xs hover:underline">
-                      {detail.lastEntry.date}
-                    </Link>
-                  )}
-                </TableCell>
-                <TableCell>{detail && <StatusDot status={detail.uptodateStatus} />}</TableCell>
-                {canWrite && (
-                  <TableCell>
-                    {detail && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-xs" aria-label={`Actions for ${row.name}`}>
-                            <MoreHorizontalIcon />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => onNewEntry(row.name)}>
-                            <PlusIcon /> New entry
-                          </DropdownMenuItem>
-                          {!detail.closedAt && (
-                            <DropdownMenuItem onSelect={() => onCloseAccount(row.name)}>
-                              <XCircleIcon /> Close account
-                            </DropdownMenuItem>
-                          )}
-                          {detail.entryHash && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onSelect={() => onViewSource(detail.entryHash!)}>
-                                <FileCodeIcon /> View source
+              <TableHead role="columnheader" className="text-right">
+                Entries
+              </TableHead>
+              <TableHead role="columnheader">Last entry</TableHead>
+              <TableHead role="columnheader" className="w-12">
+                Status
+              </TableHead>
+              {canWrite && (
+                <TableHead role="columnheader" className="w-10">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              )}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => {
+              const { detail } = row;
+              const isOpen = mode === "tree" && row.hasChildren ? forceOpen || !collapsed.has(row.name) : undefined;
+              // While searching every branch is forced open, so its open state can't change.
+              const onOpenChange = forceOpen ? undefined : (open: boolean) => setOpen(row.name, open);
+              // The row's own aria-expanded keeps the tint open parents had from their caret.
+              return (
+                <TreegridRow key={row.name} asChild level={row.level + 1} posinset={row.posinset} setsize={row.setsize} expanded={isOpen} onExpandedChange={onOpenChange}>
+                  <TableRow className={cn("aria-expanded:bg-muted/50", detail?.closedAt && "text-muted-foreground")}>
+                    <GridCell rowHeader style={{ paddingLeft: `${0.5 + row.level * 1.1}rem` }}>
+                      <span className="flex items-center gap-1">
+                        {mode === "tree" && <TreegridToggle expanded={isOpen} onExpandedChange={onOpenChange} label={row.name} />}
+                        {detail ? (
+                          <Link href={accountHref(base, row.name, queryString)} className="truncate font-mono text-[13px] hover:underline">
+                            {mode === "tree" ? accountLeaf(row.name) : row.name}
+                          </Link>
+                        ) : (
+                          <span className="truncate font-mono text-[13px] text-muted-foreground">{accountLeaf(row.name)}</span>
+                        )}
+                      </span>
+                    </GridCell>
+                    <GridCell className="font-mono text-xs text-muted-foreground">{detail?.openedAt}</GridCell>
+                    <GridCell className="font-mono text-xs">{detail?.closedAt ?? ""}</GridCell>
+                    <GridCell>
+                      {detail && detail.currencies.length > 0 && (
+                        <span className="flex flex-wrap gap-1">
+                          {detail.currencies.map((currency) => (
+                            <Badge key={currency} variant="outline" className="font-mono text-[11px]">
+                              {currency}
+                            </Badge>
+                          ))}
+                        </span>
+                      )}
+                    </GridCell>
+                    <GridCell className="text-right">
+                      <BalanceAmounts balance={row.aggregate} precisions={precisions} emptyLabel="" />
+                    </GridCell>
+                    <GridCell className="tabular text-right">{detail?.entryCount.toLocaleString()}</GridCell>
+                    <GridCell>
+                      {detail?.lastEntry && (
+                        <Link href={`${base}/entry/${detail.lastEntry.entryHash}`} className="font-mono text-xs hover:underline">
+                          {detail.lastEntry.date}
+                        </Link>
+                      )}
+                    </GridCell>
+                    <GridCell>{detail && <StatusDot status={detail.uptodateStatus} />}</GridCell>
+                    {canWrite && (
+                      <GridCell>
+                        {detail && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon-xs" aria-label={`Actions for ${row.name}`}>
+                                <MoreHorizontalIcon />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => onNewEntry(row.name)}>
+                                <PlusIcon /> New entry
                               </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                              {!detail.closedAt && (
+                                <DropdownMenuItem onSelect={() => onCloseAccount(row.name)}>
+                                  <XCircleIcon /> Close account
+                                </DropdownMenuItem>
+                              )}
+                              {detail.entryHash && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onSelect={() => onViewSource(detail.entryHash!)}>
+                                    <FileCodeIcon /> View source
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </GridCell>
                     )}
-                  </TableCell>
-                )}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                  </TableRow>
+                </TreegridRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </Treegrid>
     </section>
+  );
+}
+
+/** A table cell that joins the treegrid's cell navigation. */
+function GridCell({ rowHeader, ...props }: ComponentProps<typeof TableCell> & { rowHeader?: boolean }) {
+  return (
+    <TreegridCell asChild rowHeader={rowHeader}>
+      <TableCell {...props} />
+    </TreegridCell>
   );
 }

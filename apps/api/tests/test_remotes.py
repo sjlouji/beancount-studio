@@ -70,17 +70,6 @@ def seed_repo(tmp_path: Path) -> Path:
     return path
 
 
-@pytest.fixture
-async def admin(user: dict) -> dict:
-    """The fixture user, promoted: only the first account of a database is an administrator."""
-    async with get_session_factory()() as db:
-        row = await db.get(User, user["id"])
-        assert row is not None
-        row.is_admin = True
-        await db.commit()
-    return user
-
-
 async def _rows(ledger: dict, user: dict) -> tuple[Ledger, User]:
     async with get_session_factory()() as db:
         row = await db.get(Ledger, ledger["id"])

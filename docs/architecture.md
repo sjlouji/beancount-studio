@@ -170,6 +170,24 @@ additionally need vision. Good self-hosted choices today are Qwen3 (`qwen3:14b` 
 Llama 3.3 70B, Mistral Small 3 and DeepSeek V3 for chat, and Qwen2.5-VL or Gemma 3 for
 receipts. Small models can run the loop but are less reliable at producing valid ledger edits.
 
+**Documents.** The assistant's `create_document` tool makes HTML, PDF, Excel (`.xlsx`) and Word
+(`.docx`) files (`app/ai/documents.py`: fpdf2, openpyxl, python-docx). Every table in a
+document is a BQL query the server runs on the ledger, so figures are the ledger's own, never
+typed by the model; a query that fails fails the document with its name. The file is stored as
+an upload owned by the user (`GET /api/uploads/{id}`, owner only) and shown in the chat as a
+card with Preview (HTML in a sandboxed frame, PDF) and Download. PDFs use DejaVu Sans from the
+API image for full Unicode; without it they fall back to Helvetica (Latin-1).
+
+**Ollama on the same machine, connected in the app:** run Ollama (the Mac app, or
+`ollama serve`) with a model that calls tools pulled. An administrator then opens Ask, or
+Settings → Assistant, and picks the model: the API finds Ollama at its usual addresses
+(`localhost:11434`, `host.docker.internal:11434` from inside Docker, or the `ollama` service),
+lists its models with their capabilities, refuses ones that can't call tools (embedding models),
+and stores the choice in `instance_settings` (`ai.ollama`). It overrides the environment's
+provider on the next request, with no restart, until it is disconnected. Code:
+`app/ai/connection.py`, routes `GET /api/system/ai` and `PUT`/`DELETE /api/system/ai/ollama`
+(administrators, browser session only).
+
 **Bundled Ollama:**
 
 ```bash

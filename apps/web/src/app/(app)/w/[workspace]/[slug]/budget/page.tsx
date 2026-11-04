@@ -48,7 +48,7 @@ export default function BudgetPage() {
       <PlusIcon data-icon="inline-start" /> Add budget
     </Button>
   ) : undefined;
-  const header = <PageHeader eyebrow="Reports" title="Budget" description="Spending limits per account, compared with what actually happened." actions={addButton} />;
+  const header = <PageHeader title="Budget" description="Spending limits per account, compared with what actually happened." actions={addButton} />;
   const dialog = <NewEntryDialog open={adding} onOpenChange={setAdding} initialKind="Budget" />;
 
   if (query.isPending) {
@@ -93,7 +93,7 @@ export default function BudgetPage() {
     <div className="space-y-6">
       {header}
       <ChartTabsCard
-        className="animate-rise [animation-delay:80ms]"
+        className="animate-rise [animation-delay:40ms]"
         title="Budget vs actual"
         defaultValue="month"
         tabs={data.report.map((period) => ({
@@ -110,7 +110,7 @@ export default function BudgetPage() {
         }))}
       />
 
-      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:120ms]" aria-labelledby="budget-entries">
+      <section className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:60ms]" aria-labelledby="budget-entries">
         <header className="border-b px-4 py-2.5">
           <h3 id="budget-entries" className="text-sm font-medium">
             Budget directives

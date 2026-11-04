@@ -43,12 +43,12 @@ export default function QueryPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Query"
+       
         title="Ask the ledger in BQL"
         description="Run Beancount Query Language against the entries in scope. Results respect the time, account and filter settings in the header."
       />
 
-      <section className="space-y-3 rounded-xl border bg-card p-3 animate-rise [animation-delay:80ms]">
+      <section className="space-y-3 rounded-xl border bg-card p-3 animate-rise [animation-delay:40ms]">
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}

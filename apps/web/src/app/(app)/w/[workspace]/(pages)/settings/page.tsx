@@ -15,7 +15,7 @@ function WorkspaceSettings({ workspace }: { workspace: Workspace }) {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <PageHeader eyebrow="Workspace" title="Workspace settings" description={`${workspace.name} · /w/${workspace.slug}`} className="mb-2" />
+      <PageHeader title="Workspace settings" description={`${workspace.name} · /w/${workspace.slug}`} className="mb-2" />
       {admin && <GeneralCard key={`${workspace.slug}:${workspace.updatedAt}`} workspace={workspace} />}
       <MembersCard workspace={workspace} members={members} index={1} />
       {admin && <InviteLinksCard workspace={workspace} index={2} />}

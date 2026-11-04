@@ -22,6 +22,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
+import { Toolbar, ToolbarButton } from "@/components/ui/toolbar";
 import { apiPost, apiPut, errorMessage, isApiError } from "@/lib/api/client";
 import { ledgerPath, useFileContent, useInvalidateLedger } from "@/lib/api/hooks";
 import type { FileContent, LedgerError, Projection, WriteResult } from "@/lib/api/types";
@@ -310,26 +311,26 @@ function EditorView({ path, line }: { path: string; line?: number }) {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" disabled={check.isPending} onClick={() => check.mutate(text)}>
+          <Toolbar aria-label="File actions" className="flex-wrap overflow-visible">
+            <ToolbarButton size="sm" variant="outline" disabled={check.isPending} onClick={() => check.mutate(text)}>
               {check.isPending ? <Spinner data-icon="inline-start" /> : <ShieldCheckIcon data-icon="inline-start" />} Check
-            </Button>
+            </ToolbarButton>
             {canFormat && (
-              <Button size="sm" variant="outline" disabled={format.isPending} onClick={() => format.mutate(text)}>
+              <ToolbarButton size="sm" variant="outline" disabled={format.isPending} onClick={() => format.mutate(text)}>
                 {format.isPending ? <Spinner data-icon="inline-start" /> : <WandSparklesIcon data-icon="inline-start" />} Format
-              </Button>
+              </ToolbarButton>
             )}
             {canWrite && (
               <div className="flex items-center">
-                <Button size="sm" className="rounded-r-none" disabled={!dirty || save.isPending} onClick={runSave}>
+                <ToolbarButton size="sm" variant="default" className="rounded-r-none" disabled={!dirty || save.isPending} onClick={runSave}>
                   {save.isPending ? <Spinner data-icon="inline-start" /> : <SaveIcon data-icon="inline-start" />} Save &amp; commit
                   <Kbd className="ml-1 hidden bg-primary-foreground/15 text-primary-foreground sm:inline-flex">⌘S</Kbd>
-                </Button>
+                </ToolbarButton>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button size="icon-sm" className="h-7 rounded-l-none border-l border-primary-foreground/25" aria-label="Edit commit message">
+                    <ToolbarButton size="icon-sm" variant="default" className="h-7 rounded-l-none border-l border-primary-foreground/25" aria-label="Edit commit message">
                       <ChevronDownIcon />
-                    </Button>
+                    </ToolbarButton>
                   </PopoverTrigger>
                   <PopoverContent align="end" className="w-80 space-y-2">
                     <Label htmlFor="commit-message">Commit message</Label>
@@ -346,7 +347,7 @@ function EditorView({ path, line }: { path: string; line?: number }) {
                 </Popover>
               </div>
             )}
-          </div>
+          </Toolbar>
         </div>
       </div>
 
@@ -363,7 +364,7 @@ function EditorView({ path, line }: { path: string; line?: number }) {
         </Alert>
       )}
 
-      <div className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:60ms]">
+      <div className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:30ms]">
         <div className="h-[calc(100dvh-20rem)] min-h-[360px]">
           <Editor
             path={path}

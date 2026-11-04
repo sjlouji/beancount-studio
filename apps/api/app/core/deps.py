@@ -14,6 +14,7 @@ from fastapi import Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.connection import effective_settings
 from app.config import Settings, get_settings
 from app.core.security import hash_token
 from app.db.base import get_db
@@ -198,6 +199,28 @@ async def require_session_user(auth: AuthDep) -> User:
 
 
 SessionUserDep = Annotated[User, Depends(require_session_user)]
+
+
+async def require_instance_admin(user: SessionUserDep) -> User:
+    """Configuration of the whole instance (the assistant's model) belongs to its administrators."""
+    if not user.is_admin:
+        raise ForbiddenError("Only an administrator can change the assistant's model")
+    return user
+
+
+InstanceAdminDep = Annotated[User, Depends(require_instance_admin)]
+
+
+async def get_ai_settings(db: DbDep, settings: SettingsDep) -> Settings:
+    """The settings with the model connection an admin made in the app laid over the environment.
+
+    Every route that talks to a model (or reports whether one is available) takes these, so a
+    connection made in the app takes effect on the next request without a restart.
+    """
+    return await effective_settings(db, settings)
+
+
+AiSettingsDep = Annotated[Settings, Depends(get_ai_settings)]
 
 
 async def find_workspace(db: AsyncSession, slug: str) -> Workspace | None:

@@ -80,9 +80,9 @@
   --shadow-lg: var(--shadow-level-3);
   --shadow-xl: var(--shadow-level-3);
   --shadow-float: var(--shadow-level-3);
-  --animate-rise: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  --animate-fade: fade 0.25s ease-out both;
-  --animate-materialize: materialize 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-rise: rise 0.22s var(--ease-out) both;
+  --animate-fade: fade 0.25s var(--ease-out) both;
+  --animate-materialize: materialize 0.18s var(--ease-out) both;
   --animate-ticker: ticker 48s linear infinite;
   @keyframes collapsible-down {
     from { height: 0; }
@@ -93,7 +93,7 @@
     to { height: 0; }
   }
   @keyframes rise {
-    from { opacity: 0; transform: translateY(6px); }
+    from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
   }
   @keyframes fade {
@@ -110,7 +110,19 @@
   }
 }
 
-/* Light: white canvas, Apple greys, system blue. */
+/*
+ * Motion curves. These replace Tailwind's built-in `ease-out` / `ease-in-out`, which are too weak
+ * to read as deliberate motion. `ease-out` is for anything entering or leaving, `ease-in-out` for
+ * things moving on screen, and `ease-drawer` (iOS sheet curve) for panels sliding in from an edge.
+ */
+@theme {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Light: Apple monochrome. White canvas, Apple greys, near-black for the primary action and
+   selection; blue only where something is a link or has focus. */
 :root {
   /* The platform face first (SF on Apple devices), Inter where there is none. */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", ui-sans-serif, var(--font-inter), "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -124,11 +136,11 @@
   --card-foreground: #1d1d1f;
   --popover: rgb(255 255 255 / 0.84);
   --popover-foreground: #1d1d1f;
-  --primary: #007aff;
-  --primary-press: #0066d6;
+  --primary: #1d1d1f;
+  --primary-press: #424245;
   --primary-foreground: #ffffff;
-  --secondary: rgb(0 122 255 / 0.12);
-  --secondary-foreground: #0066cc;
+  --secondary: #e8e8ed;
+  --secondary-foreground: #1d1d1f;
   --muted: #f5f5f7;
   --muted-foreground: #6e6e73;
   --accent: rgb(120 120 128 / 0.12);
@@ -157,7 +169,7 @@
   --sidebar: #f5f5f7;
   --sidebar-foreground: #1d1d1f;
   --sidebar-muted: #6e6e73;
-  --sidebar-primary: #007aff;
+  --sidebar-primary: #1d1d1f;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: rgb(0 0 0 / 0.06);
   --sidebar-accent-foreground: #1d1d1f;
@@ -171,24 +183,25 @@
   --shadow-level-3: 0 24px 64px rgb(0 0 0 / 0.2), 0 8px 20px rgb(0 0 0 / 0.1);
 }
 
-/* Dark: the Slack dark surfaces from the reference, Apple's dark-mode colours on top. */
+/* Dark: true black, as on Apple's and SpaceX's sites. Surfaces lift in near-black greys, the
+   primary action and selection turn white, links and focus stay blue. */
 .dark {
-  --background: #1a1d21;
-  --foreground: #e9e9eb;
-  --surface: #222529;
+  --background: #000000;
+  --foreground: #f5f5f7;
+  --surface: #0d0d0d;
   --fill: rgb(120 120 128 / 0.24);
   --fill-secondary: rgb(120 120 128 / 0.16);
-  --card: #222529;
-  --card-foreground: #e9e9eb;
-  --popover: rgb(34 37 41 / 0.88);
-  --popover-foreground: #e9e9eb;
-  --primary: #0a84ff;
-  --primary-press: #409cff;
-  --primary-foreground: #ffffff;
-  --secondary: rgb(10 132 255 / 0.18);
-  --secondary-foreground: #6cb2ff;
-  --muted: #2a2d31;
-  --muted-foreground: #9b9ca1;
+  --card: #161617;
+  --card-foreground: #f5f5f7;
+  --popover: rgb(28 28 30 / 0.88);
+  --popover-foreground: #f5f5f7;
+  --primary: #f5f5f7;
+  --primary-press: #d2d2d7;
+  --primary-foreground: #000000;
+  --secondary: #2c2c2e;
+  --secondary-foreground: #f5f5f7;
+  --muted: #1c1c1e;
+  --muted-foreground: #a1a1a6;
   --accent: rgb(255 255 255 / 0.08);
   --accent-foreground: #ffffff;
   --destructive: #ff453a;
@@ -198,10 +211,10 @@
   --negative-foreground: #ffffff;
   --warning: #ffb340;
   --warning-foreground: #2b1a00;
-  --link: #409cff;
+  --link: #2997ff;
   --link-hover: #6cb2ff;
-  --border: rgb(255 255 255 / 0.1);
-  --input: rgb(255 255 255 / 0.14);
+  --border: rgb(255 255 255 / 0.12);
+  --input: rgb(255 255 255 / 0.16);
   --ring: #0a84ff;
   --chart-1: #0a84ff;
   --chart-2: #30d158;
@@ -211,18 +224,18 @@
   --chart-6: #ff375f;
   --chart-7: #5e5ce6;
   --chart-8: #ffd60a;
-  --sidebar: #1a1d21;
-  --sidebar-foreground: #d1d2d3;
-  --sidebar-muted: #9b9ca1;
-  --sidebar-primary: #0a84ff;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #e5e5ea;
+  --sidebar-muted: #a1a1a6;
+  --sidebar-primary: #f5f5f7;
+  --sidebar-primary-foreground: #000000;
   --sidebar-accent: rgb(255 255 255 / 0.08);
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgb(255 255 255 / 0.08);
+  --sidebar-border: rgb(255 255 255 / 0.1);
   --sidebar-ring: #0a84ff;
-  --rail: #121417;
-  --rail-foreground: #d1d2d3;
-  --rail-accent: rgb(255 255 255 / 0.1);
+  --rail: #000000;
+  --rail-foreground: #e5e5ea;
+  --rail-accent: rgb(255 255 255 / 0.12);
   --shadow-level-1: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-level-2: 0 8px 24px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.3);
   --shadow-level-3: 0 24px 64px rgb(0 0 0 / 0.6), 0 8px 20px rgb(0 0 0 / 0.4);
@@ -236,6 +249,20 @@
     @apply font-sans antialiased;
     font-optical-sizing: auto;
     text-rendering: optimizeLegibility;
+    /* Feel installed on a phone: no grey tap flash, no landscape font inflation, and the app
+       shell doesn't rubber-band as a whole (its scroll columns still do). */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    overscroll-behavior: none;
+  }
+  button, [role="button"], a {
+    touch-action: manipulation;
+  }
+  /* Tailwind's reset gives buttons the arrow while links get the hand; everything clickable shows
+     the hand. Menu items keep their arrow through `cursor-default`, which wins over this layer. */
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]), summary {
+    cursor: pointer;
   }
   body {
     @apply bg-background text-foreground;
@@ -247,7 +274,7 @@
     @apply font-semibold;
   }
   ::selection {
-    background: color-mix(in srgb, var(--primary) 24%, transparent);
+    background: color-mix(in srgb, var(--ring) 24%, transparent);
   }
   code, kbd, pre, samp, .font-mono {
     font-feature-settings: "liga" 0;
@@ -281,15 +308,24 @@
   color: var(--link);
   text-decoration-line: none;
   text-underline-offset: 3px;
-  &:hover { color: var(--link-hover); text-decoration-line: underline; }
+  @media (hover: hover) {
+    &:hover { color: var(--link-hover); text-decoration-line: underline; }
+  }
 }
 
 @utility tabular {
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Press feedback lives on the press itself: instant, slight, and reversed on release. */
+/*
+ * Press feedback lives on the press itself: slight, 100ms, and eased back on release. `press`
+ * owns the control's transition list, so don't combine it with another `transition-*` class;
+ * add a property here instead.
+ */
 @utility press {
+  transition-property: color, background-color, border-color, box-shadow, transform;
+  transition-duration: 100ms;
+  transition-timing-function: var(--ease-out);
   &:active:not(:disabled) { transform: scale(0.97); }
 }
 
@@ -316,18 +352,33 @@
   @media (prefers-reduced-transparency: reduce) { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; }
   @media (prefers-contrast: more) { background: var(--card); border-color: var(--foreground); }
 }
+/* 20px, not 40: at 94% opacity a heavier blur is invisible but is recomputed every frame the
+   dialog or sheet animates. */
 @utility material-thick {
   background: color-mix(in srgb, var(--card) 94%, transparent);
-  -webkit-backdrop-filter: blur(40px) saturate(160%);
-  backdrop-filter: blur(40px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
   @media (prefers-reduced-transparency: reduce) { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/*
+ * The window's title bar in the Mac app. The bar drags the window and starts after the traffic
+ * lights (`titlebar-area-x`, set by the shell's window-controls overlay; 0 in a browser, where
+ * none of this has any effect). Controls inside stay clickable.
+ */
+@utility titlebar {
+  -webkit-app-region: drag;
+  padding-left: max(0.75rem, env(titlebar-area-x, 0px));
+  & :is(a, button, input, select, textarea, [role="button"], [role="combobox"], [role="menu"]) {
+    -webkit-app-region: no-drag;
+  }
 }
 
 /* Soft backdrop for public surfaces (sign-in): two cool tints on the grouped grey, nothing more. */
 @utility aurora {
   background-color: var(--surface);
   background-image:
-    radial-gradient(60% 50% at 15% 10%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 70%),
+    radial-gradient(60% 50% at 15% 10%, color-mix(in srgb, var(--ring) 14%, transparent), transparent 70%),
     radial-gradient(50% 45% at 85% 90%, color-mix(in srgb, var(--chart-7) 12%, transparent), transparent 70%);
 }
 

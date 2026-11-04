@@ -10,6 +10,7 @@ import { accountHref, useLedgerContext } from "@/components/ledger/ledger-contex
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useDocuments } from "@/lib/api/hooks";
 
 const DOCUMENT_EXAMPLE = `option "documents" "documents"
@@ -25,7 +26,7 @@ export default function DocumentsPage() {
   if (documents.isPending) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Documents" title="Statements and receipts" />
+        <PageHeader title="Statements and receipts" />
         <CardSkeleton rows={6} />
       </div>
     );
@@ -36,7 +37,7 @@ export default function DocumentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Documents"
+       
         title="Statements and receipts"
         description="Files attached to accounts through Beancount `document` directives. Click a file name to open it in a new tab."
         actions={
@@ -64,7 +65,7 @@ export default function DocumentsPage() {
           }
         />
       ) : (
-        <div className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:80ms]">
+        <div className="animate-rise overflow-hidden rounded-xl border bg-card [animation-delay:40ms]">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -73,7 +74,7 @@ export default function DocumentsPage() {
                 <TableHead>File</TableHead>
                 <TableHead>Tags &amp; links</TableHead>
                 <TableHead className="w-12">
-                  <span className="sr-only">Preview</span>
+                  <VisuallyHidden>Preview</VisuallyHidden>
                 </TableHead>
               </TableRow>
             </TableHeader>
